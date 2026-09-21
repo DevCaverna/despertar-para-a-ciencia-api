@@ -64,7 +64,7 @@ void test('prepares the first release when Unreleased is the only section', asyn
 	});
 
 	const updatedPackage = JSON.parse(
-		await fs.readFile(path.join(directory, 'package.json'), 'utf8'),
+		String(await fs.readFile(path.join(directory, 'package.json'), 'utf8')),
 	);
 	const updatedChangelog = await fs.readFile(
 		path.join(directory, 'CHANGELOG.md'),
