@@ -84,7 +84,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 	try {
 		/** @type {PackageJson} */
-		const packageJson = JSON.parse(await fs.readFile(packagePath, 'utf8'));
+		const packageJson = JSON.parse(
+			String(await fs.readFile(packagePath, 'utf8')),
+		);
 		const changelog = await fs.readFile(changelogPath, 'utf8');
 		const result = prepareRelease({
 			packageJson,
