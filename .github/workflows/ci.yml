@@ -1,0 +1,113 @@
+name: CI
+
+on:
+    pull_request:
+        branches:
+            - main
+    workflow_call:
+
+permissions:
+    contents: read
+
+jobs:
+    quality:
+        name: quality
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node-pnpm
+            - run: pnpm prisma:contract:check
+            - run: pnpm prisma:migration:check
+            - run: pnpm format:check
+            - run: pnpm docs:check
+            - run: pnpm lint
+            - run: for script in scripts/*.sh; do sh -n "$script"; done
+            - run: pnpm typecheck
+            - run: pnpm build
+            - run: pnpm test:release
+
+    unit:
+        name: unit
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node-pnpm
+            - run: pnpm test:cov
+
+    e2e:
+        name: e2e
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:18@sha256:bfe50b2b0ddd9b55eadedd066fe24c7c6fe06626185b73358c480ea37868024d
+                env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: despertar_para_a_ciencia_test
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U postgres"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+        env:
+            DATABASE_URL: postgresql://postgres:postgres@localhost:5432/despertar_para_a_ciencia_test
+            FIREBASE_PROJECT_ID: test-project
+            FIREBASE_PRIVATE_KEY: '-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----'
+            FIREBASE_CLIENT_EMAIL: test@test.iam.gserviceaccount.com
+            FIREBASE_WEB_API_KEY: fake-api-key
+            SEND_EMAILS: 'false'
+            MAIL_DRIVER: noop
+            CORS_ORIGINS: http://localhost:3000
+            SWAGGER_ENABLED: 'false'
+            PORT: 3001
+            API_NAME: Despertar para a Ciência API Tests
+            NODE_ENV: test
+            STORAGE_DRIVER: memory
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node-pnpm
+            - run: pnpm test:e2e
+
+    firebase-auth:
+        name: firebase-auth
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        env:
+            FIREBASE_PROJECT_ID: demo-despertar-para-a-ciencia-api
+            FIREBASE_CLIENT_EMAIL: test@test.iam.gserviceaccount.com
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-node-pnpm
+            - run: java -version
+            - name: Create emulator credentials
+              shell: bash
+              run: |
+                  {
+                    echo 'FIREBASE_PRIVATE_KEY<<EOF'
+                    openssl genrsa 2048
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+            - run: pnpm test:auth-emulator
+
+    container-smoke:
+        name: container-smoke
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: ./.github/actions/setup-podman
+            - name: Build OCI image
+              env:
+                  IMAGE: despertar-para-a-ciencia-api:pr-${{ github.sha }}
+              run: podman build --format oci --file Containerfile --tag "$IMAGE" .
+            - name: Smoke test image
+              env:
+                  IMAGE: despertar-para-a-ciencia-api:pr-${{ github.sha }}
+              run: sh scripts/smoke-test-image.sh "$IMAGE"
+            - name: Remove local image
+              if: always()
+              env:
+                  IMAGE: despertar-para-a-ciencia-api:pr-${{ github.sha }}
+              run: podman rmi "$IMAGE" || true

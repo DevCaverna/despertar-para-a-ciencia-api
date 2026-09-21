@@ -1,0 +1,35 @@
+# Build
+*.tsbuildinfo
+/dist/
+/generated/
+/node_modules/
+
+# Env / secrets
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Github
+/.github
+
+# Documentation and agent artifacts
+/.agents
+/docs
+/README.md
+/CONTRIBUTING.md
+/AGENTS.md
+/CHANGELOG.md
+
+# Test
+/test
+
+# Editor / OS
+.vscode/
+
+# Container
+Containerfile
+.containerignore
+compose.yml

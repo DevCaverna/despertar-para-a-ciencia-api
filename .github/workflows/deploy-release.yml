@@ -1,0 +1,54 @@
+name: Deploy Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: Existing SemVer release without the v prefix
+                required: true
+                type: string
+            environment:
+                description: GitHub Environment destination
+                required: true
+                type: environment
+
+permissions:
+    contents: read
+    packages: read
+
+jobs:
+    resolve:
+        runs-on: ubuntu-latest
+        outputs:
+            digest: ${{ steps.resolve.outputs.digest }}
+            source_sha: ${{ steps.resolve.outputs.source_sha }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+            - uses: ./.github/actions/setup-node-pnpm
+            - id: resolve
+              env:
+                  VERSION: ${{ inputs.version }}
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  [ "$GITHUB_REF" = 'refs/heads/main' ] || { echo 'deploy release must be started from main' >&2; exit 1; }
+                  node -e "const semver=require('semver'); if (!semver.valid(process.env.VERSION) || process.env.VERSION.includes('+')) process.exit(1)"
+                  tag="v$VERSION"
+                  git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null || { echo 'release tag not found' >&2; exit 1; }
+                  git fetch origin "refs/tags/$tag:refs/tags/$tag"
+                  source_sha=$(git rev-parse "$tag^{commit}")
+                  image="ghcr.io/${GITHUB_REPOSITORY,,}"
+                  printf '%s' "$GH_TOKEN" | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
+                  digest=$(docker buildx imagetools inspect "$image:$tag" --format '{{json .Manifest.Digest}}' | tr -d '"')
+                  case "$digest" in sha256:????????????????????????????????????????????????????????????????) ;; *) echo 'release image digest not found' >&2; exit 1 ;; esac
+                  printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+                  printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+    deploy:
+        needs: resolve
+        uses: ./.github/workflows/deploy-image.yml
+        secrets: inherit
+        with:
+            environment: ${{ inputs.environment }}
+            image_digest: ${{ needs.resolve.outputs.digest }}
+            expected_source_sha: ${{ needs.resolve.outputs.source_sha }}

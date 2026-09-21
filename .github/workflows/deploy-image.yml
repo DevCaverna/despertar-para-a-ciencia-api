@@ -1,0 +1,270 @@
+name: Deploy Image
+
+on:
+    workflow_call:
+        inputs:
+            environment:
+                required: true
+                type: string
+            image_digest:
+                required: true
+                type: string
+            expected_source_sha:
+                required: true
+                type: string
+
+permissions:
+    contents: read
+    packages: read
+
+concurrency:
+    group: ${{ github.repository }}-deploy-${{ inputs.environment }}
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        environment: ${{ inputs.environment }}
+        permissions:
+            contents: read
+            packages: read
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.expected_source_sha }}
+                  fetch-depth: 1
+            - name: Validate deployment source checkout
+              shell: bash
+              env:
+                  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+              run: |
+                  set -euo pipefail
+                  actual_source_sha=$(git rev-parse HEAD)
+                  if [ "$actual_source_sha" != "$EXPECTED_SOURCE_SHA" ]; then
+                    echo 'deployment source checkout does not match expected image source' >&2
+                    echo "expected: $EXPECTED_SOURCE_SHA" >&2
+                    echo "actual:   $actual_source_sha" >&2
+                    exit 1
+                  fi
+                  test -f scripts/deploy-podman.sh
+                  test -f scripts/create-runtime-env.sh
+            - name: Validate digest
+              shell: bash
+              env:
+                  DIGEST: ${{ inputs.image_digest }}
+                  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+              run: |
+                  case "$DIGEST" in
+                    sha256:????????????????????????????????????????????????????????????????) ;;
+                    *) echo 'image digest must use sha256:<64 lowercase hex>' >&2; exit 64 ;;
+                  esac
+                  digest_value="${DIGEST#sha256:}"
+                  case "$digest_value" in *[!0123456789abcdef]*) echo 'image digest must use lowercase hexadecimal' >&2; exit 64 ;; esac
+                  [ "${#EXPECTED_SOURCE_SHA}" -eq 40 ] || { echo 'expected source SHA must be a 40-character lowercase Git SHA' >&2; exit 64; }
+                  case "$EXPECTED_SOURCE_SHA" in *[!0123456789abcdef]*) echo 'expected source SHA must be lowercase hexadecimal' >&2; exit 64 ;; esac
+            - uses: ./.github/actions/setup-podman
+            - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+              with:
+                  cosign-release: v3.1.3
+            - name: Check Cosign version
+              run: cosign version
+            # The build publishes the image name in lowercase (OCI names reject uppercase);
+            # github.repository keeps the repository's original casing.
+            - name: Resolve image name
+              shell: bash
+              run: printf 'IMAGE=ghcr.io/%s\n' "${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+            - name: Login to GHCR with Podman
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  printf '%s' '${{ github.token }}' |
+                    podman login ghcr.io \
+                      --username '${{ github.actor }}' \
+                      --password-stdin
+            - name: Pull image
+              shell: bash
+              env:
+                  DIGEST: ${{ inputs.image_digest }}
+              run: |
+                  set -euo pipefail
+                  timeout --foreground 180 podman pull "$IMAGE@$DIGEST"
+            - name: Login to GHCR with Cosign
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  printf '%s' '${{ github.token }}' |
+                    cosign login ghcr.io \
+                      --username '${{ github.actor }}' \
+                      --password-stdin
+            - name: Verify image signature
+              shell: bash
+              env:
+                  DIGEST: ${{ inputs.image_digest }}
+              run: |
+                  set -euo pipefail
+                  timeout --foreground 120 \
+                    cosign verify \
+                      --timeout 90s \
+                      --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-image.yml@refs/heads/main" \
+                      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                      "$IMAGE@$DIGEST"
+            - name: Verify SPDX attestation
+              shell: bash
+              env:
+                  DIGEST: ${{ inputs.image_digest }}
+              run: |
+                  set -euo pipefail
+
+                      verification_output="$RUNNER_TEMP/verified-spdx-attestation.json"
+
+                          timeout \
+                            --signal=TERM \
+                            --kill-after=10s \
+                            180s \
+                            cosign verify-attestation \
+                              --timeout 120s \
+                              --type spdxjson \
+                              --certificate-identity \
+                                "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-image.yml@refs/heads/main" \
+                              --certificate-oidc-issuer \
+                                https://token.actions.githubusercontent.com \
+                              "$IMAGE@$DIGEST" \
+                            > "$verification_output"
+
+                          test -s "$verification_output"
+
+                          echo "SPDX attestation verified successfully"
+                          echo "Verification output size: $(wc -c < "$verification_output") bytes"
+            - name: Verify image source SHA
+              shell: bash
+              env:
+                  DIGEST: ${{ inputs.image_digest }}
+                  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+              run: |
+                  set -euo pipefail
+                  actual_source_sha=$(podman image inspect \
+                    --format '{{ index .Labels "org.opencontainers.image.revision" }}' \
+                    "$IMAGE@$DIGEST")
+
+                  if [ "$actual_source_sha" != "$EXPECTED_SOURCE_SHA" ]; then
+                    echo 'image source SHA does not match expected source SHA' >&2
+                    echo "expected: $EXPECTED_SOURCE_SHA" >&2
+                    echo "actual:   $actual_source_sha" >&2
+                    exit 1
+                  fi
+            - name: Configure SSH
+              env:
+                  DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+                  DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+              run: |
+                  set -euo pipefail
+                  install -m 700 -d "$HOME/.ssh"
+                  printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+                  printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+                  chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+            - name: Transfer image and deploy
+              env:
+                  API_NAME: ${{ vars.API_NAME }}
+                  BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+                  BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
+                  CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+                  CLOUDFLARE_R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}
+                  CLOUDFLARE_R2_BUCKET_NAME: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+                  CLOUDFLARE_R2_PUBLIC_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}
+                  CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+                  CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+                  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+                  DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+                  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+                  ENVIRONMENT: ${{ inputs.environment }}
+                  FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+                  FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+                  FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+                  DIGEST: ${{ inputs.image_digest }}
+                  LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+                  MAIL_DRIVER: ${{ vars.MAIL_DRIVER }}
+                  NODE_ENV: ${{ vars.NODE_ENV }}
+                  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+                  OTEL_CLIENT_CERTIFICATE_PEM: ${{ secrets.OTEL_CLIENT_CERTIFICATE_PEM }}
+                  OTEL_CLIENT_KEY_PEM: ${{ secrets.OTEL_CLIENT_KEY_PEM }}
+                  OTEL_RESOURCE_ATTRIBUTES: service.version=${{ inputs.expected_source_sha }},deployment.environment.name=${{ inputs.environment }}
+                  OTEL_SERVICE_NAME: ${{ vars.OTEL_SERVICE_NAME }}
+                  OTEL_TRACES_SAMPLER: ${{ vars.OTEL_TRACES_SAMPLER }}
+                  OTEL_TRACES_SAMPLER_ARG: ${{ vars.OTEL_TRACES_SAMPLER_ARG }}
+                  PORT: ${{ vars.PORT }}
+                  SEND_EMAILS: ${{ vars.SEND_EMAILS }}
+                  STORAGE_DRIVER: ${{ vars.STORAGE_DRIVER }}
+                  SWAGGER_ENABLED: ${{ vars.SWAGGER_ENABLED }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  app_name=$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9_.-' '-')
+                  case "$ENVIRONMENT" in ''|*[!a-zA-Z0-9_.-]*) echo 'invalid environment' >&2; exit 64 ;; esac
+                  environment_arg=$(printf '%q' "$ENVIRONMENT")
+                  bundle_dir=$(mktemp -d)
+                  trap 'rm -rf "$bundle_dir"' EXIT
+                  umask 077
+                  if [ -n "${OTEL_CLIENT_CERTIFICATE_PEM:-}" ] && [ -z "${OTEL_CLIENT_KEY_PEM:-}" ]; then
+                    echo 'OTEL client certificate was configured without its private key' >&2
+                    exit 78
+                  fi
+                  if [ -z "${OTEL_CLIENT_CERTIFICATE_PEM:-}" ] && [ -n "${OTEL_CLIENT_KEY_PEM:-}" ]; then
+                    echo 'OTEL client private key was configured without its certificate' >&2
+                    exit 78
+                  fi
+                  otel_secret_files=''
+                  if [ -n "${OTEL_CLIENT_CERTIFICATE_PEM:-}" ]; then
+                    printf '%s\n' "$OTEL_CLIENT_CERTIFICATE_PEM" > "$bundle_dir/otel-client.crt"
+                    printf '%s\n' "$OTEL_CLIENT_KEY_PEM" > "$bundle_dir/otel-client.key"
+                    chmod 600 "$bundle_dir/otel-client.crt" "$bundle_dir/otel-client.key"
+                    export OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE=/run/secrets/otel-client.crt
+                    export OTEL_EXPORTER_OTLP_CLIENT_KEY=/run/secrets/otel-client.key
+                    otel_secret_files='otel-client.crt otel-client.key'
+                  fi
+                  NODE_ENV="${NODE_ENV:-$ENVIRONMENT}" bash scripts/create-runtime-env.sh "$bundle_dir/runtime.env"
+                  cp scripts/deploy-podman.sh "$bundle_dir/deploy-podman.sh"
+                  image_ref="$app_name-$ENVIRONMENT-deploy:${DIGEST#sha256:}"
+                  podman tag "$IMAGE@$DIGEST" "$image_ref"
+                  deploy_target="$DEPLOY_USER@$DEPLOY_HOST"
+
+                  timeout \
+                    --signal=TERM \
+                    --kill-after=10s \
+                    --foreground \
+                    300s \
+                    bash -c '
+                      set -euo pipefail
+
+                      podman save --format oci-archive "$1" |
+                        gzip -1 |
+                        ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" \
+                          -o BatchMode=yes \
+                          -o ConnectTimeout=20 \
+                          -o ConnectionAttempts=2 \
+                          -o IdentitiesOnly=yes \
+                          "$2" "gzip -d | podman load"
+                    ' -- "$image_ref" "$deploy_target"
+
+                  remote_command="set -eu; remote_dir=\$(mktemp -d); trap 'rm -rf \"\$remote_dir\"' EXIT; gzip -d | tar -xf - -C \"\$remote_dir\"; chmod 600 \"\$remote_dir/runtime.env\"; chmod 700 \"\$remote_dir/deploy-podman.sh\"; sh \"\$remote_dir/deploy-podman.sh\" $environment_arg '$app_name' '$image_ref' \"\$remote_dir/runtime.env\""
+                  if [ -n "$otel_secret_files" ]; then
+                    remote_command="$remote_command \"\$remote_dir/otel-client.crt\" \"\$remote_dir/otel-client.key\""
+                  fi
+                  timeout \
+                    --signal=TERM \
+                    --kill-after=10s \
+                    --foreground \
+                    300s \
+                    bash -c '
+                      set -euo pipefail
+
+                      tar -C "$1" -cf - runtime.env deploy-podman.sh $4 |
+                        gzip -1 |
+                        ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" \
+                          -o BatchMode=yes \
+                          -o ConnectTimeout=20 \
+                          -o ConnectionAttempts=2 \
+                          -o IdentitiesOnly=yes \
+                          "$2" "$3"
+                    ' -- "$bundle_dir" "$deploy_target" "$remote_command" "$otel_secret_files"

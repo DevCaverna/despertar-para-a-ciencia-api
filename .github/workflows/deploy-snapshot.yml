@@ -1,0 +1,51 @@
+name: Deploy Snapshot
+
+on:
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: Branch or commit SHA to build
+                required: true
+                default: main
+                type: string
+            environment:
+                description: GitHub Environment destination
+                required: true
+                type: environment
+
+permissions:
+    contents: read
+    packages: write
+    id-token: write
+
+jobs:
+    resolve:
+        runs-on: ubuntu-latest
+        outputs:
+            sha: ${{ steps.resolve.outputs.sha }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+            - id: resolve
+              env:
+                  REF: ${{ inputs.ref }}
+              run: |
+                  [ "$GITHUB_REF" = 'refs/heads/main' ] || { echo 'deploy snapshot must be started from main' >&2; exit 1; }
+                  git fetch origin "$REF" --depth=1 || git fetch origin main --depth=1
+                  sha=$(git rev-parse "$REF^{commit}" 2>/dev/null || git rev-parse "origin/$REF^{commit}")
+                  printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+    build:
+        needs: resolve
+        uses: ./.github/workflows/build-image.yml
+        with:
+            ref: ${{ needs.resolve.outputs.sha }}
+            image_tag: ${{ needs.resolve.outputs.sha }}
+    deploy:
+        needs: [build, resolve]
+        uses: ./.github/workflows/deploy-image.yml
+        secrets: inherit
+        with:
+            environment: ${{ inputs.environment }}
+            image_digest: ${{ needs.build.outputs.digest }}
+            expected_source_sha: ${{ needs.resolve.outputs.sha }}

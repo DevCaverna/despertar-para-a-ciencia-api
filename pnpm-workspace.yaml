@@ -1,0 +1,33 @@
+allowBuilds:
+  '@firebase/util': true
+  '@nestjs/core': true
+  '@parcel/watcher': false
+  '@prisma/engines': true
+  '@scarf/scarf': true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  protobufjs: true
+  re2: true
+  sharp: true
+  unrs-resolver: true
+  workerd: true
+overrides:
+  deepmerge-ts: '>=8.0.0'
+  lodash: '>=4.18.1'
+  mysql2: '>=3.23.1'
+  uuid: '>=11.1.1'
+minimumReleaseAgeExclude:
+  - uuid@11.1.1
+  - '@opentelemetry/core@2.8.0'
+  - multer@2.2.0
+  - js-yaml@3.15.1 || 4.1.2 || 4.3.0 || 4.3.1
+  - ws@8.21.0
+  - '@opentelemetry/propagator-jaeger@2.9.0'
+  - sharp@0.35.0
+  - find-my-way@9.6.1
+  - valibot@1.4.2
+  - brace-expansion@5.0.9
+  - socket.io-parser@4.2.7
+  - fast-uri@3.1.5
+  - deepmerge-ts@8.0.0

@@ -1,0 +1,106 @@
+name: Notify PR on Discord
+
+on:
+    pull_request:
+        types:
+            - opened
+            - reopened
+            - ready_for_review
+
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    notify:
+        # Secrets are unavailable in job-level conditions. This variable keeps
+        # the workflow skipped until Discord notifications are explicitly enabled.
+        if: vars.DISCORD_PR_NOTIFICATIONS_ENABLED == 'true'
+        runs-on: ubuntu-latest
+        env:
+            DISCORD_PR_WEBHOOK: ${{ secrets.DISCORD_PR_WEBHOOK }}
+            GH_TOKEN: ${{ github.token }}
+
+        steps:
+            - name: Validate notification configuration
+              id: config
+              shell: bash
+              run: |
+                  if [[ -z "$DISCORD_PR_WEBHOOK" ]]; then
+                    echo "Discord PR notification is enabled but DISCORD_PR_WEBHOOK is not configured. Skipping."
+                    echo "enabled=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+            - name: Collect PR data
+              id: pr
+              if: steps.config.outputs.enabled == 'true'
+              env:
+                  REPOSITORY: ${{ github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+                  REQUESTED_REVIEWERS: ${{ toJson(github.event.pull_request.requested_reviewers) }}
+              shell: bash
+              run: |
+                  changelog=$(curl --fail-with-body --silent --show-error \
+                    --max-time 15 \
+                    --header "Authorization: Bearer $GH_TOKEN" \
+                    --header "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER/commits" \
+                    | jq -r '.[0:15][].commit.message' \
+                    | sed 's/^/- /')
+
+                  if [[ -z "$changelog" ]]; then
+                    changelog="Nenhuma alteração listada"
+                  fi
+                  changelog=${changelog:0:1000}
+
+                  reviewers=$(jq -r '.[].login' <<< "$REQUESTED_REVIEWERS" \
+                    | sed 's/^/@/' \
+                    | paste -sd ', ' -)
+
+                  if [[ -z "$reviewers" ]]; then
+                    reviewers="Nenhum"
+                  fi
+
+                  delimiter="discord_$(openssl rand -hex 16)"
+                  {
+                    echo "changelog<<$delimiter"
+                    echo "$changelog"
+                    echo "$delimiter"
+                    echo "reviewers=$reviewers"
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Send Discord notification
+              if: steps.config.outputs.enabled == 'true'
+              env:
+                  PR_TITLE: ${{ github.event.pull_request.title }}
+                  PR_URL: ${{ github.event.pull_request.html_url }}
+                  PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+                  PR_HEAD: ${{ github.event.pull_request.head.ref }}
+                  PR_BASE: ${{ github.event.pull_request.base.ref }}
+                  REPOSITORY: ${{ github.repository }}
+                  CHANGELOG: ${{ steps.pr.outputs.changelog }}
+                  REVIEWERS: ${{ steps.pr.outputs.reviewers }}
+              shell: bash
+              run: |
+                  payload=$(jq -n \
+                    --arg title "📣 Pull Request aberto - $REPOSITORY" \
+                    --arg url "$PR_URL" \
+                    --arg description "$PR_TITLE" \
+                    --arg author "$PR_AUTHOR" \
+                    --arg branch "$PR_HEAD → $PR_BASE" \
+                    --arg reviewers "$REVIEWERS" \
+                    --arg changelog "$CHANGELOG" \
+                    '{allowed_mentions: {parse: []}, embeds: [{title: $title, url: $url, description: $description, color: 5814783, fields: [
+                      {name: "Autor", value: $author, inline: true},
+                      {name: "Branch", value: $branch, inline: true},
+                      {name: "Reviewers", value: $reviewers, inline: false},
+                      {name: "Changelog", value: $changelog}
+                    ]}]}')
+
+                   curl --fail-with-body --silent --show-error --max-time 15 \
+                     --request POST "$DISCORD_PR_WEBHOOK" \
+                     --header 'Content-Type: application/json' \
+                     --data "$payload"

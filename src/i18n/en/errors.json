@@ -1,0 +1,6 @@
+{
+	"FORBIDDEN": "You don't have access to this resource",
+	"NOT_FOUND": "{entity} not found",
+	"ALREADY_EXISTS": "A {entity} with this information already exists",
+	"ERROR_SENDING_EMAIL": "Could not send the email"
+}
