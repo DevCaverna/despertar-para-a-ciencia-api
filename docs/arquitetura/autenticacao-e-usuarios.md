@@ -28,8 +28,6 @@ O onboarding exige Firebase ID Token. Antes de criar o perfil, o cliente solicit
 | `GET`   | `/users/profile`                      | Retorna o perfil autenticado e ativo.                  |
 | `PATCH` | `/users/profile`                      | Atualiza somente o nome do perfil autenticado e ativo. |
 
-Um perfil inativo não acessa as rotas privadas de usuários, mesmo que o token ainda seja formalmente válido.
-
 ## Administração
 
 As rotas abaixo exigem `ADMIN` e perfil local ativo:

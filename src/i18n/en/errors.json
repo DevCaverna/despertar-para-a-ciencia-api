@@ -7,7 +7,6 @@
 	"PROFILE_CREATION_FAILED": "Could not create the profile",
 	"FIREBASE_ACCOUNT_NOT_FOUND": "The Firebase account was not found",
 	"LAST_ACTIVE_ADMINISTRATOR": "The last active administrator cannot be changed",
-	"PROFILE_INACTIVE": "The user profile is inactive",
 	"VERIFIED_EMAIL_REQUIRED": "A verified email address is required",
 	"NAME_REQUIRED": "Name is required",
 	"PROFILE_EMAIL_MISMATCH": "The profile email must match the authenticated email",

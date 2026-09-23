@@ -165,14 +165,6 @@ describe('UserService', () => {
 		);
 	});
 
-	it('rejects access to an inactive profile', async () => {
-		users.findById.mockResolvedValue({ ...profile, active: false });
-
-		await expect(
-			service.getProfile(mockUser({ id: profile.id })),
-		).rejects.toThrow(ForbiddenException);
-	});
-
 	it('does not remove the last active administrator', async () => {
 		users.findById.mockResolvedValue(profile);
 		users.findAllActive.mockReturnValue([profile]);

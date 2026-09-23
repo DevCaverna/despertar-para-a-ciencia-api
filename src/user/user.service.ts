@@ -119,11 +119,11 @@ export class UserService {
 	}
 
 	getProfile(actor: AuthUser): Promise<User> {
-		return this.requireActiveProfile(actor);
+		return this.requireProfile(actor);
 	}
 
 	async updateProfile(actor: AuthUser, name: string): Promise<User> {
-		const user = await this.requireActiveProfile(actor);
+		const user = await this.requireProfile(actor);
 		const updated = await this.prisma.database.orm.public.User.where({
 			id: user.id,
 		}).update({
@@ -140,7 +140,7 @@ export class UserService {
 		page: number,
 		perPage: number,
 	): Promise<Array<User & { roles: UserRole[] }>> {
-		await this.requireActiveProfile(actor);
+		await this.requireProfile(actor);
 		const users: User[] = [];
 		for await (const row of this.prisma.database.orm.public.User.orderBy(
 			(user) => user.createdAt.desc(),
@@ -164,7 +164,7 @@ export class UserService {
 		userId: string,
 		roles: UserRole[],
 	): Promise<User> {
-		await this.requireActiveProfile(actor);
+		await this.requireProfile(actor);
 		const user = await this.requireUser(userId);
 		const firebaseUser = await this.auth.getUserByEmail(user.email);
 		if (!firebaseUser) {
@@ -198,7 +198,7 @@ export class UserService {
 		userId: string,
 		active: boolean,
 	): Promise<User> {
-		await this.requireActiveProfile(actor);
+		await this.requireProfile(actor);
 		const user = await this.requireUser(userId);
 		const firebaseUser = await this.auth.getUserByEmail(user.email);
 		if (!firebaseUser) {
@@ -241,17 +241,13 @@ export class UserService {
 		return updated;
 	}
 
-	private async requireActiveProfile(actor: AuthUser): Promise<User> {
+	private async requireProfile(actor: AuthUser): Promise<User> {
 		if (!actor.id)
 			throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
 		const user = await this.prisma.database.orm.public.User.first({
 			id: actor.id,
 		});
 		if (!user) throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
-		if (!user.active)
-			throw new ForbiddenException(
-				this.i18n.t('errors.PROFILE_INACTIVE'),
-			);
 		return user;
 	}
 
