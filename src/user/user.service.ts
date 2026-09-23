@@ -160,16 +160,15 @@ export class UserService {
 		roles: UserRole[],
 	): Promise<User> {
 		await this.requireProfile(actor);
-		const user = await this.requireUser(userId);
-		const authUser = await this.auth.getUserByEmail(user.email);
-		if (!authUser) {
-			throw new ConflictException(
-				this.i18n.t('errors.AUTH_ACCOUNT_NOT_FOUND'),
-			);
-		}
-
 		const normalizedRoles = [...new Set(roles)];
 		return this.withAdministrativeMutex(async () => {
+			const user = await this.requireUser(userId);
+			const authUser = await this.auth.getUserByEmail(user.email);
+			if (!authUser) {
+				throw new ConflictException(
+					this.i18n.t('errors.AUTH_ACCOUNT_NOT_FOUND'),
+				);
+			}
 			if (
 				user.active &&
 				authUser.roles.includes(UserRole.ADMIN) &&

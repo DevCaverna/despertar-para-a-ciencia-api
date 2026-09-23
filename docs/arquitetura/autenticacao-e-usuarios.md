@@ -30,7 +30,7 @@ O onboarding exige Firebase ID Token. Antes de criar ou reconciliar o perfil, o 
 
 ## Administração
 
-As rotas abaixo exigem `ADMIN` e perfil local ativo:
+As rotas abaixo exigem a claim `ADMIN` e perfil local ativo no PostgreSQL. A validação do Firebase usa `verifyIdToken(token, true)`, que também rejeita tokens revogados e contas Firebase desativadas; `requireProfile()` verifica adicionalmente `User.active` para que uma divergência entre sistemas não conceda acesso administrativo.
 
 | Método  | Rota                | Comportamento                                              |
 | ------- | ------------------- | ---------------------------------------------------------- |
@@ -39,6 +39,8 @@ As rotas abaixo exigem `ADMIN` e perfil local ativo:
 | `PATCH` | `/users/:id/status` | Ativa ou desativa o perfil e a conta Firebase.             |
 
 A API não permite remover ou desativar o último administrador ativo. Alterações administrativas são serializadas por um mutex local da instância da API; essa proteção reduz corridas dentro da instância, sem pretender oferecer lock distribuído. A listagem limita `perPage` a 100 e informa `authAccountExists` para distinguir perfis sem conta Firebase de contas sem papéis. Falha na consulta Firebase interrompe a operação com `503`; a contagem de administradores falha fechada.
+
+Se o perfil local estiver inativo enquanto a conta Firebase e o token ainda estiverem ativos, as rotas que exigem perfil local respondem `403`. Se a conta Firebase estiver desativada ou o token revogado, a autenticação falha antes da autorização do perfil. A reconciliação dessas divergências deve ocorrer pelo fluxo administrativo após validar ambos os estados.
 
 Se a atualização do estado local falhar após a mudança no Firebase, a API tenta compensar a alteração. Se a compensação também falhar, registra `user_status_compensation_failed` com os tipos das duas falhas e retorna `503`; a equipe deve comparar o estado da conta Firebase com `User.active` e corrigir pelo fluxo administrativo antes de repetir a operação.
 

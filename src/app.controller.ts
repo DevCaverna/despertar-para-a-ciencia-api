@@ -17,7 +17,7 @@ const readinessDuration = metrics
 	.getMeter('despertar-para-a-ciencia-api.health')
 	.createHistogram('application.readiness.duration', {
 		unit: 'ms',
-		description: 'Duration of the PostgreSQL readiness check.',
+		description: 'Duration of the PostgreSQL and Redis readiness check.',
 	});
 
 @ApiTags('Health')

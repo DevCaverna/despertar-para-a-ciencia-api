@@ -93,6 +93,25 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		await getAuth().updateUser(uid, { disabled: false });
 	});
 
+	it('exposes changed custom claims only in a newly issued ID token', async () => {
+		const issuedToken = await signIn();
+		await getAuth().setCustomUserClaims(uid, {
+			id: 'application-user-id',
+			roles: [UserRole.USER],
+		});
+
+		await expect(adapter.validateToken(issuedToken)).resolves.toMatchObject(
+			{
+				roles: [UserRole.ADMIN],
+			},
+		);
+		await expect(
+			adapter.validateToken(await signIn()),
+		).resolves.toMatchObject({
+			roles: [UserRole.USER],
+		});
+	});
+
 	it('rejects tokens revoked after issuance', async () => {
 		const token = await signIn();
 		await new Promise((resolve) => setTimeout(resolve, 1100));

@@ -15,7 +15,7 @@ describe('AppController', () => {
 		expect(controller.live()).toEqual({ status: 'ok' });
 	});
 
-	it('returns readiness after querying PostgreSQL', async () => {
+	it('returns readiness after querying PostgreSQL and Redis', async () => {
 		const healthCheck = vi.fn().mockResolvedValue(undefined);
 		const redisPing = vi.fn().mockResolvedValue('PONG');
 		const controller = new AppController(
@@ -32,7 +32,7 @@ describe('AppController', () => {
 		expect(redisPing).toHaveBeenCalledOnce();
 	});
 
-	it('reports unavailable when PostgreSQL cannot be queried', async () => {
+	it('reports unavailable when PostgreSQL or Redis cannot be queried', async () => {
 		const loggerError = vi
 			.spyOn(Logger.prototype, 'error')
 			.mockImplementation(() => undefined);

@@ -30,12 +30,12 @@ import { UserModel, type User } from './models/user.model.js';
 import { UserService } from './user.service.js';
 
 @ApiTags('Users')
-@ApiBearerAuth('firebase-auth')
 @Controller('users')
 export class UserController {
 	constructor(private readonly users: UserService) {}
 
 	@Post('profile')
+	@ApiBearerAuth('firebase-auth')
 	@ApiOperation({ summary: 'Create or reconcile the authenticated profile' })
 	@ApiCreatedResponse({ type: UserModel })
 	createProfile(
@@ -55,6 +55,7 @@ export class UserController {
 	}
 
 	@Get('profile')
+	@ApiBearerAuth('firebase-auth')
 	@ApiOperation({ summary: 'Get the authenticated profile' })
 	@ApiOkResponse({ type: UserModel })
 	getProfile(@Actor() actor: AuthUser): Promise<User> {
@@ -62,6 +63,7 @@ export class UserController {
 	}
 
 	@Patch('profile')
+	@ApiBearerAuth('firebase-auth')
 	@ApiOperation({ summary: 'Update the authenticated profile name' })
 	@ApiOkResponse({ type: UserModel })
 	updateProfile(
@@ -72,6 +74,7 @@ export class UserController {
 	}
 
 	@Get()
+	@ApiBearerAuth('firebase-auth')
 	@Roles(UserRole.ADMIN)
 	@ApiOperation({ summary: 'List user profiles' })
 	@ApiOkResponse({ type: UserModel, isArray: true })
@@ -85,6 +88,7 @@ export class UserController {
 	}
 
 	@Patch(':id/roles')
+	@ApiBearerAuth('firebase-auth')
 	@Roles(UserRole.ADMIN)
 	@ApiOperation({ summary: 'Replace a user role set' })
 	@ApiOkResponse({ type: UserModel })
@@ -97,6 +101,7 @@ export class UserController {
 	}
 
 	@Patch(':id/status')
+	@ApiBearerAuth('firebase-auth')
 	@Roles(UserRole.ADMIN)
 	@ApiOperation({ summary: 'Activate or deactivate a user' })
 	@ApiOkResponse({ type: UserModel })
