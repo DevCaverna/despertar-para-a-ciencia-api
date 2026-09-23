@@ -20,7 +20,9 @@ export interface AuthPort {
 		roles: UserRole[];
 	}): Promise<void>;
 
-	setUserDisabled(firebaseUid: string, disabled: boolean): Promise<void>;
+	enableUser(firebaseUid: string): Promise<void>;
+
+	disableUser(firebaseUid: string): Promise<void>;
 
 	revokeSessions(firebaseUid: string): Promise<void>;
 }

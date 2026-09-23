@@ -33,7 +33,8 @@ export function createMockAuthService(): Record<string, Mock> {
 		getUserByUid: vi.fn(),
 		getUserByEmail: vi.fn(),
 		setUserClaims: vi.fn(),
-		setUserDisabled: vi.fn(),
+		enableUser: vi.fn(),
+		disableUser: vi.fn(),
 		revokeSessions: vi.fn(),
 	};
 }

@@ -217,24 +217,25 @@ export class UserService {
 			);
 		}
 
-		await this.auth.setUserDisabled(firebaseUser.firebaseUid, !active);
+		const setUserStatus = active
+			? this.auth.enableUser.bind(this.auth)
+			: this.auth.disableUser.bind(this.auth);
+		await setUserStatus(firebaseUser.firebaseUid);
 		let updated: User | null;
 		try {
 			updated = await this.prisma.database.orm.public.User.where({
 				id: user.id,
 			}).update({ active, updatedAt: new Date().toISOString() });
 		} catch (error) {
-			await this.auth.setUserDisabled(
-				firebaseUser.firebaseUid,
-				!user.active,
-			);
+			await (user.active
+				? this.auth.enableUser(firebaseUser.firebaseUid)
+				: this.auth.disableUser(firebaseUser.firebaseUid));
 			throw error;
 		}
 		if (!updated) {
-			await this.auth.setUserDisabled(
-				firebaseUser.firebaseUid,
-				!user.active,
-			);
+			await (user.active
+				? this.auth.enableUser(firebaseUser.firebaseUid)
+				: this.auth.disableUser(firebaseUser.firebaseUid));
 			throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
 		}
 		await this.auth.revokeSessions(firebaseUser.firebaseUid);

@@ -28,8 +28,12 @@ export class AuthService {
 		return this.auth.setUserClaims(input);
 	}
 
-	setUserDisabled(firebaseUid: string, disabled: boolean): Promise<void> {
-		return this.auth.setUserDisabled(firebaseUid, disabled);
+	enableUser(firebaseUid: string): Promise<void> {
+		return this.auth.enableUser(firebaseUid);
+	}
+
+	disableUser(firebaseUid: string): Promise<void> {
+		return this.auth.disableUser(firebaseUid);
 	}
 
 	revokeSessions(firebaseUid: string): Promise<void> {

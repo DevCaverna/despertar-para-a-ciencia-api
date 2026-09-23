@@ -88,4 +88,18 @@ describe('FirebaseAuthAdapter', () => {
 		});
 		expect(rootAuth.revokeRefreshTokens).not.toHaveBeenCalled();
 	});
+
+	it('enables and disables Firebase users explicitly', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+
+		await adapter.enableUser('user-id');
+		await adapter.disableUser('user-id');
+
+		expect(rootAuth.updateUser).toHaveBeenNthCalledWith(1, 'user-id', {
+			disabled: false,
+		});
+		expect(rootAuth.updateUser).toHaveBeenNthCalledWith(2, 'user-id', {
+			disabled: true,
+		});
+	});
 });

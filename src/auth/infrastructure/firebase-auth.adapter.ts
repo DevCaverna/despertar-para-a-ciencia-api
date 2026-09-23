@@ -128,15 +128,22 @@ export class FirebaseAuthAdapter implements AuthPort {
 		});
 	}
 
-	async setUserDisabled(
-		firebaseUid: string,
-		disabled: boolean,
-	): Promise<void> {
+	async enableUser(firebaseUid: string): Promise<void> {
 		return measureDependency({
 			dependency: 'firebase',
-			operation: 'update_user',
+			operation: 'enable_user',
 			work: async () => {
-				await getAuth().updateUser(firebaseUid, { disabled });
+				await getAuth().updateUser(firebaseUid, { disabled: false });
+			},
+		});
+	}
+
+	async disableUser(firebaseUid: string): Promise<void> {
+		return measureDependency({
+			dependency: 'firebase',
+			operation: 'disable_user',
+			work: async () => {
+				await getAuth().updateUser(firebaseUid, { disabled: true });
 			},
 		});
 	}

@@ -32,7 +32,8 @@ describe('UserService', () => {
 		auth = {
 			setUserClaims: vi.fn(),
 			getUserByEmail: vi.fn(),
-			setUserDisabled: vi.fn(),
+			enableUser: vi.fn(),
+			disableUser: vi.fn(),
 			revokeSessions: vi.fn(),
 		};
 		i18n = { t: vi.fn((key: string) => key) };
