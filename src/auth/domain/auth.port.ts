@@ -6,39 +6,21 @@ export const AUTH_PORT = Symbol('AuthPort');
 export interface AuthPort {
 	validateToken(token: string): Promise<AuthUser>;
 
-	markEmailAsVerified({
-		id,
-		email,
-	}: {
-		id: string;
-		email: string;
-	}): Promise<void>;
-
-	assignUserRoles({
-		roles,
-		email,
-	}: {
-		email: string;
-		roles: UserRole[];
-	}): Promise<void>;
-
-	revokeUserRoles({
-		roles,
-		email,
-	}: {
-		email: string;
-		roles: UserRole[];
-	}): Promise<void>;
-
-	updatePassword({
-		email,
-		password,
-	}: {
-		email: string;
-		password: string;
-	}): Promise<void>;
+	getUserByUid(firebaseUid: string): Promise<AuthUser | undefined>;
 
 	getUserByEmail(email: string): Promise<AuthUser | undefined>;
 
-	deleteUserByEmail(email: string): Promise<void>;
+	setUserClaims({
+		firebaseUid,
+		id,
+		roles,
+	}: {
+		firebaseUid: string;
+		id?: string;
+		roles: UserRole[];
+	}): Promise<void>;
+
+	setUserDisabled(firebaseUid: string, disabled: boolean): Promise<void>;
+
+	revokeSessions(firebaseUid: string): Promise<void>;
 }

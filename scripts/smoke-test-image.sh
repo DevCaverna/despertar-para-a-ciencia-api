@@ -21,6 +21,7 @@ firebase_private_key=$(printf '%s\n' "$firebase_private_key" | sed 's/$/\\n/' | 
 printf '%s\n' \
   'API_NAME=Despertar para a Ciência API smoke test' \
   'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/smoke' \
+  'REDIS_URL=redis://127.0.0.1:6379' \
   'FIREBASE_CLIENT_EMAIL=test@test.iam.gserviceaccount.com' \
   'FIREBASE_PROJECT_ID=test-project' \
   'LOG_LEVEL=warn' \

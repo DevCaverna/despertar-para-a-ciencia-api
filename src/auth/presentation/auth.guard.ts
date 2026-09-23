@@ -56,7 +56,7 @@ export class AuthGuard implements CanActivate {
 
 		if (
 			requiredRoles?.length &&
-			!user?.roles?.some((role) => requiredRoles.includes(role))
+			!user?.roles.some((role) => requiredRoles.includes(role))
 		) {
 			throw new ForbiddenException(
 				`You don't have access to this resource`,

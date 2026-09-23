@@ -51,6 +51,9 @@ export interface AppConfig {
 	database: {
 		runtimeUrl: string;
 	};
+	redis: {
+		url: string;
+	};
 	auth: {
 		firebase: {
 			projectId: string;

@@ -15,6 +15,14 @@ function postgresUrl(variableName: string): z.ZodString {
 
 const databaseUrl = postgresUrl('DATABASE_URL');
 
+const redisUrl = z
+	.string()
+	.url()
+	.refine(
+		(value) => ['redis:', 'rediss:'].includes(new URL(value).protocol),
+		'REDIS_URL must use the Redis protocol.',
+	);
+
 const booleanValue = z
 	.enum(['true', 'false'], {
 		error: 'Value must be either "true" or "false".',
@@ -71,6 +79,7 @@ const baseEnvironmentSchema = z.object({
 	SWAGGER_ENABLED: booleanValue,
 	API_NAME: z.string().min(1).default('Despertar para a Ciência API'),
 	DATABASE_URL: databaseUrl,
+	REDIS_URL: redisUrl,
 	FIREBASE_PROJECT_ID: z.string().min(1),
 	FIREBASE_PRIVATE_KEY: z.string().min(1),
 	FIREBASE_CLIENT_EMAIL: z.string().email(),

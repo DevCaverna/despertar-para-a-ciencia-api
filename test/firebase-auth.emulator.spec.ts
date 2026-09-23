@@ -36,7 +36,7 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		uid = user.uid;
 		await getAuth().setCustomUserClaims(uid, {
 			id: 'application-user-id',
-			roles: [UserRole.ADMINISTRATOR],
+			roles: [UserRole.ADMIN],
 		});
 	});
 
@@ -74,9 +74,10 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		const user = await adapter.validateToken(await signIn());
 
 		expect(user).toMatchObject({
+			firebaseUid: uid,
 			id: 'application-user-id',
 			email,
-			roles: [UserRole.ADMINISTRATOR],
+			roles: [UserRole.ADMIN],
 			provider: 'firebase',
 		});
 	});

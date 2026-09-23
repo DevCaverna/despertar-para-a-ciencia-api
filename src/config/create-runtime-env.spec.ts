@@ -21,6 +21,7 @@ function runtimeEnvironment(): NodeJS.ProcessEnv {
 		CORS_ORIGINS: 'http://localhost:3000',
 		SWAGGER_ENABLED: 'false',
 		DATABASE_URL: 'postgresql://api_user:password@localhost:5432/app',
+		REDIS_URL: 'redis://localhost:6379',
 		FIREBASE_PROJECT_ID: 'test-project',
 		FIREBASE_PRIVATE_KEY:
 			'-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----',

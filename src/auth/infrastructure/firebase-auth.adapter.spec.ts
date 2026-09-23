@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRole } from '../domain/user-role.js';
 
 const rootAuth = {
+	getUser: vi.fn(),
 	getUserByEmail: vi.fn(),
 	setCustomUserClaims: vi.fn(),
 	revokeRefreshTokens: vi.fn(),
@@ -49,22 +50,42 @@ describe('FirebaseAuthAdapter', () => {
 		);
 	});
 
-	it('revokes refresh tokens after assigning an administrative role', async () => {
+	it('maps the Firebase UID and ignores invalid role claims', async () => {
 		const adapter = new FirebaseAuthAdapter(config as never);
-		rootAuth.getUserByEmail.mockResolvedValue({
+		rootAuth.verifyIdToken.mockResolvedValue({
+			uid: 'firebase-uid',
+			email: 'user@example.com',
+			email_verified: true,
+			id: 'profile-id',
+			roles: [UserRole.ADMIN, 'INVALID', UserRole.ADMIN],
+		});
+
+		await expect(adapter.validateToken('valid-token')).resolves.toEqual({
+			firebaseUid: 'firebase-uid',
+			id: 'profile-id',
+			email: 'user@example.com',
+			emailVerified: true,
+			roles: [UserRole.ADMIN],
+			provider: 'firebase',
+		});
+	});
+
+	it('replaces roles while preserving the profile claim', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.getUser.mockResolvedValue({
 			uid: 'user-id',
 			customClaims: { id: 'app-user-id', roles: [] },
 		});
 
-		await adapter.assignUserRoles({
-			email: 'admin@example.com',
-			roles: [UserRole.ADMINISTRATOR],
+		await adapter.setUserClaims({
+			firebaseUid: 'user-id',
+			roles: [UserRole.ADMIN],
 		});
 
 		expect(rootAuth.setCustomUserClaims).toHaveBeenCalledWith('user-id', {
 			id: 'app-user-id',
-			roles: [UserRole.ADMINISTRATOR],
+			roles: [UserRole.ADMIN],
 		});
-		expect(rootAuth.revokeRefreshTokens).toHaveBeenCalledWith('user-id');
+		expect(rootAuth.revokeRefreshTokens).not.toHaveBeenCalled();
 	});
 });

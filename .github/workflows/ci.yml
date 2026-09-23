@@ -51,8 +51,18 @@ jobs:
                     --health-interval 10s
                     --health-timeout 5s
                     --health-retries 5
+            redis:
+                image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd "redis-cli ping"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
         env:
             DATABASE_URL: postgresql://postgres:postgres@localhost:5432/despertar_para_a_ciencia_test
+            REDIS_URL: redis://localhost:6379
             FIREBASE_PROJECT_ID: test-project
             FIREBASE_PRIVATE_KEY: '-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----'
             FIREBASE_CLIENT_EMAIL: test@test.iam.gserviceaccount.com

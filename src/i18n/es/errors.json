@@ -2,5 +2,16 @@
 	"FORBIDDEN": "No tienes acceso a este recurso",
 	"NOT_FOUND": "{entity} no encontrado(a)",
 	"ALREADY_EXISTS": "Ya existe un(a) {entity} con esta información",
-	"ERROR_SENDING_EMAIL": "Error al enviar el correo electrónico"
+	"ERROR_SENDING_EMAIL": "Error al enviar el correo electrónico",
+	"PROFILE_CLAIM_INVALID": "El identificador del perfil no es válido",
+	"PROFILE_CREATION_FAILED": "No se pudo crear el perfil",
+	"FIREBASE_ACCOUNT_NOT_FOUND": "No se encontró la cuenta de Firebase",
+	"LAST_ACTIVE_ADMINISTRATOR": "No se puede cambiar el último administrador activo",
+	"ADMIN_OPERATION_IN_PROGRESS": "Otra operación administrativa está en curso",
+	"PROFILE_INACTIVE": "El perfil de usuario está inactivo",
+	"VERIFIED_EMAIL_REQUIRED": "Se requiere una dirección de correo electrónico verificada",
+	"NAME_REQUIRED": "El nombre es obligatorio",
+	"PROFILE_EMAIL_MISMATCH": "El correo electrónico del perfil debe coincidir con el correo autenticado",
+	"EMAIL_ALREADY_REGISTERED": "Este correo electrónico ya tiene un perfil",
+	"EMAIL_VERIFICATION_CODE_INVALID": "El código de verificación es inválido o caducó"
 }

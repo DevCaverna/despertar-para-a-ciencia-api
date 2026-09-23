@@ -54,10 +54,10 @@ describe('AuthGuard', () => {
 	});
 
 	it('populates the request user after validating a token', async () => {
-		const user = mockUser({ roles: [UserRole.ADMINISTRATOR] });
+		const user = mockUser({ roles: [UserRole.ADMIN] });
 		vi.spyOn(reflector, 'getAllAndOverride')
 			.mockReturnValueOnce(false)
-			.mockReturnValueOnce([UserRole.ADMINISTRATOR]);
+			.mockReturnValueOnce([UserRole.ADMIN]);
 		authService.validateToken.mockResolvedValue(user);
 		const context = createMockExecutionContext('Bearer valid-token');
 
@@ -70,7 +70,7 @@ describe('AuthGuard', () => {
 	it('enforces required roles', async () => {
 		vi.spyOn(reflector, 'getAllAndOverride')
 			.mockReturnValueOnce(false)
-			.mockReturnValueOnce([UserRole.ADMINISTRATOR]);
+			.mockReturnValueOnce([UserRole.ADMIN]);
 		authService.validateToken.mockResolvedValue(mockUser());
 
 		await expect(

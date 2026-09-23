@@ -49,6 +49,10 @@ export class PrismaService implements OnModuleDestroy {
 		);
 	}
 
+	get database(): PrismaDatabase {
+		return this.prismaClient;
+	}
+
 	private async runClientTransaction<T>(
 		client: PrismaDatabase,
 		fn: (tx: PrismaTransaction) => Promise<T>,

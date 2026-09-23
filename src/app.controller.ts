@@ -1,3 +1,4 @@
+import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
 	Controller,
 	Get,
@@ -6,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { metrics } from '@opentelemetry/api';
+import { Redis } from 'ioredis';
 
 import { Public } from './decorators/public.decorator.js';
 import { PrismaService } from './prisma/prisma.service.js';
@@ -23,7 +25,10 @@ const readinessDuration = metrics
 export class AppController {
 	private readonly logger = new Logger(AppController.name);
 
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		@InjectRedis() private readonly redis: Redis,
+	) {}
 
 	@Public()
 	@Get()
@@ -42,7 +47,7 @@ export class AppController {
 	async ready(): Promise<{ status: string }> {
 		const startedAt = performance.now();
 		try {
-			await this.prisma.healthCheck();
+			await Promise.all([this.prisma.healthCheck(), this.redis.ping()]);
 			readinessDuration.record(performance.now() - startedAt, {
 				result: 'success',
 			});
@@ -53,7 +58,7 @@ export class AppController {
 			});
 			this.logger.error({
 				event: 'readiness_failed',
-				dependency: 'postgresql',
+				dependency: 'postgresql_or_redis',
 				'error.type': errorType(error),
 			});
 			throw new ServiceUnavailableException({ status: 'error' });

@@ -12,51 +12,27 @@ export class AuthService {
 		return this.auth.validateToken(token);
 	}
 
-	async assignUserRoles({
-		roles,
-		email,
-	}: {
-		roles: UserRole[];
-		email: string;
-	}): Promise<void> {
-		return this.auth.assignUserRoles({ roles, email });
+	getUserByUid(firebaseUid: string): Promise<AuthUser | undefined> {
+		return this.auth.getUserByUid(firebaseUid);
 	}
 
-	async revokeUserRoles({
-		roles,
-		email,
-	}: {
-		roles: UserRole[];
-		email: string;
-	}): Promise<void> {
-		return this.auth.revokeUserRoles({ roles, email });
-	}
-
-	async markEmailAsVerified({
-		email,
-		id,
-	}: {
-		id: string;
-		email: string;
-	}): Promise<void> {
-		return this.auth.markEmailAsVerified({ email, id });
-	}
-
-	async updatePassword({
-		email,
-		password,
-	}: {
-		email: string;
-		password: string;
-	}): Promise<void> {
-		return this.auth.updatePassword({ email, password });
-	}
-
-	async getUserByEmail(email: string): Promise<AuthUser | undefined> {
+	getUserByEmail(email: string): Promise<AuthUser | undefined> {
 		return this.auth.getUserByEmail(email);
 	}
 
-	async deleteUserByEmail(email: string): Promise<void> {
-		return this.auth.deleteUserByEmail(email);
+	setUserClaims(input: {
+		firebaseUid: string;
+		id?: string;
+		roles: UserRole[];
+	}): Promise<void> {
+		return this.auth.setUserClaims(input);
+	}
+
+	setUserDisabled(firebaseUid: string, disabled: boolean): Promise<void> {
+		return this.auth.setUserDisabled(firebaseUid, disabled);
+	}
+
+	revokeSessions(firebaseUid: string): Promise<void> {
+		return this.auth.revokeSessions(firebaseUid);
 	}
 }

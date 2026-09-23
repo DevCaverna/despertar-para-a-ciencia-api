@@ -186,6 +186,7 @@ jobs:
                   LOG_LEVEL: ${{ vars.LOG_LEVEL }}
                   MAIL_DRIVER: ${{ vars.MAIL_DRIVER }}
                   NODE_ENV: ${{ vars.NODE_ENV }}
+                  REDIS_URL: ${{ secrets.REDIS_URL }}
                   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
                   OTEL_CLIENT_CERTIFICATE_PEM: ${{ secrets.OTEL_CLIENT_CERTIFICATE_PEM }}
                   OTEL_CLIENT_KEY_PEM: ${{ secrets.OTEL_CLIENT_KEY_PEM }}
