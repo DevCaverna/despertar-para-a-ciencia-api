@@ -103,6 +103,16 @@ export class FirebaseAuthAdapter implements AuthPort {
 		});
 	}
 
+	async markEmailVerified(subject: string): Promise<void> {
+		return measureDependency({
+			dependency: 'firebase',
+			operation: 'verify_email',
+			work: async () => {
+				await getAuth().updateUser(subject, { emailVerified: true });
+			},
+		});
+	}
+
 	async setUserClaims({
 		subject,
 		id,

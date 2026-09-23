@@ -26,6 +26,8 @@ function runtimeEnvironment(): NodeJS.ProcessEnv {
 		FIREBASE_PRIVATE_KEY:
 			'-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----',
 		FIREBASE_CLIENT_EMAIL: 'test@example.com',
+		EMAIL_VERIFICATION_HMAC_SECRET:
+			'a-secure-test-secret-with-at-least-32-chars',
 		STORAGE_DRIVER: 'memory',
 		LOG_LEVEL: 'silent',
 		API_NAME: 'Test API',
@@ -55,6 +57,9 @@ describe('create-runtime-env.sh', () => {
 				'FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\\nFAKE\\n-----END PRIVATE KEY-----\\n',
 			);
 			expect(contents).toContain('API_NAME=Test API\n');
+			expect(contents).toContain(
+				'EMAIL_VERIFICATION_HMAC_SECRET=a-secure-test-secret-with-at-least-32-chars\n',
+			);
 			expect(contents).not.toContain('OTEL_EXPORTER_OTLP_ENDPOINT=');
 			expect(contents).not.toContain(
 				'OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE=',

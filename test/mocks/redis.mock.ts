@@ -9,9 +9,16 @@ export interface RedisMocks {
 	incr: MockFunction;
 	expire: MockFunction;
 	ttl: MockFunction;
+	eval: MockFunction;
+	multi: MockFunction;
+	transaction: { setex: MockFunction; exec: MockFunction };
 }
 
 export function createMockRedis(): RedisMocks {
+	const transaction = {
+		setex: vi.fn().mockReturnThis(),
+		exec: vi.fn().mockResolvedValue([]),
+	};
 	return {
 		get: vi.fn(),
 		setex: vi.fn(),
@@ -19,5 +26,8 @@ export function createMockRedis(): RedisMocks {
 		incr: vi.fn(),
 		expire: vi.fn(),
 		ttl: vi.fn(),
+		eval: vi.fn().mockResolvedValue(1),
+		multi: vi.fn(() => transaction),
+		transaction,
 	};
 }

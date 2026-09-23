@@ -101,4 +101,14 @@ describe('FirebaseAuthAdapter', () => {
 			disabled: true,
 		});
 	});
+
+	it('marks a Firebase email as verified', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+
+		await adapter.markEmailVerified('user-id');
+
+		expect(rootAuth.updateUser).toHaveBeenCalledWith('user-id', {
+			emailVerified: true,
+		});
+	});
 });

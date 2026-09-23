@@ -20,6 +20,10 @@ export class AuthService {
 		return this.auth.getUserByEmail(email);
 	}
 
+	markEmailVerified(subject: string): Promise<void> {
+		return this.auth.markEmailVerified(subject);
+	}
+
 	setUserClaims(input: {
 		subject: string;
 		id?: string;

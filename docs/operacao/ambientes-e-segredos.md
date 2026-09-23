@@ -10,7 +10,7 @@
 
 Cada destino de deploy usa GitHub Environment. Variáveis não sensíveis de operação são Actions Variables; credenciais de deploy, banco, Firebase, Brevo, R2 e Google são Actions Secrets. O workflow cria `runtime.env` por allowlist e `migration.env` separado, ambos temporários e com permissão `600`.
 
-A chave privada Firebase multiline é serializada no arquivo temporário com `\n` literal. Não coloque secrets em argumentos de comando, imagens OCI, logs ou arquivos persistentes da VPS.
+A chave privada Firebase multiline é serializada no arquivo temporário com `\n` literal. `EMAIL_VERIFICATION_HMAC_SECRET` é obrigatório, deve conter ao menos 32 caracteres aleatórios e precisa ser configurado como GitHub Actions Secret em cada Environment de deploy. Não coloque secrets em argumentos de comando, imagens OCI, logs ou arquivos persistentes da VPS.
 
 ## Menor privilégio e rotação
 

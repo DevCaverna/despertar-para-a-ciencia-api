@@ -22,6 +22,8 @@ export type I18nTranslations = {
         "NAME_REQUIRED": string;
         "PROFILE_EMAIL_MISMATCH": string;
         "SESSION_REVOCATION_PENDING": string;
+        "USER_STATUS_RECONCILIATION_REQUIRED": string;
+        "AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": string;
         "EMAIL_VERIFICATION_CODE_INVALID": string;
     };
     "fields": {

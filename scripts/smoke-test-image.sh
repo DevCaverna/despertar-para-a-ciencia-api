@@ -24,6 +24,7 @@ printf '%s\n' \
   'REDIS_URL=redis://127.0.0.1:6379' \
   'FIREBASE_CLIENT_EMAIL=test@test.iam.gserviceaccount.com' \
   'FIREBASE_PROJECT_ID=test-project' \
+  'EMAIL_VERIFICATION_HMAC_SECRET=a-secure-smoke-test-secret-with-at-least-32-chars' \
   'LOG_LEVEL=warn' \
   'MAIL_DRIVER=noop' \
   'NODE_ENV=test' \

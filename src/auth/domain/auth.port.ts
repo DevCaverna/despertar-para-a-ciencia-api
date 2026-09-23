@@ -10,6 +10,8 @@ export interface AuthPort {
 
 	getUserByEmail(email: string): Promise<AuthUser | undefined>;
 
+	markEmailVerified(subject: string): Promise<void>;
+
 	setUserClaims({
 		subject,
 		id,

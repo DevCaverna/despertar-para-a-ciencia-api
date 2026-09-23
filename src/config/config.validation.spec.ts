@@ -16,6 +16,8 @@ function validEnvironment(): Record<string, unknown> {
 		FIREBASE_PROJECT_ID: 'test-project',
 		FIREBASE_PRIVATE_KEY: 'private-key',
 		FIREBASE_CLIENT_EMAIL: 'test@example.com',
+		EMAIL_VERIFICATION_HMAC_SECRET:
+			'a-secure-test-secret-with-at-least-32-chars',
 		STORAGE_DRIVER: 'memory',
 	};
 }
@@ -78,6 +80,13 @@ describe('validateEnvironment', () => {
 		delete config.NODE_ENV;
 		delete config.MAIL_DRIVER;
 		delete config.STORAGE_DRIVER;
+
+		expect(environmentSchema.safeParse(config).success).toBe(false);
+	});
+
+	it('requires a sufficiently long email verification HMAC secret', () => {
+		const config = validEnvironment();
+		config.EMAIL_VERIFICATION_HMAC_SECRET = 'too-short';
 
 		expect(environmentSchema.safeParse(config).success).toBe(false);
 	});

@@ -11,5 +11,7 @@
 	"NAME_REQUIRED": "El nombre es obligatorio",
 	"PROFILE_EMAIL_MISMATCH": "El correo electrónico del perfil debe coincidir con el correo autenticado",
 	"SESSION_REVOCATION_PENDING": "No se pudo confirmar la revocación de las sesiones. Inténtalo de nuevo.",
+	"USER_STATUS_RECONCILIATION_REQUIRED": "No se pudo sincronizar el estado de la cuenta. Se notificó al equipo responsable.",
+	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "No se pudieron consultar las cuentas de autenticación. Inténtalo de nuevo.",
 	"EMAIL_VERIFICATION_CODE_INVALID": "El código de verificación es inválido o caducó"
 }

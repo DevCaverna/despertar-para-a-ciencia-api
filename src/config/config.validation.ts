@@ -83,6 +83,7 @@ const baseEnvironmentSchema = z.object({
 	FIREBASE_PROJECT_ID: z.string().min(1),
 	FIREBASE_PRIVATE_KEY: z.string().min(1),
 	FIREBASE_CLIENT_EMAIL: z.string().email(),
+	EMAIL_VERIFICATION_HMAC_SECRET: z.string().min(32),
 	BREVO_API_KEY: optionalString,
 	BREVO_SENDER_EMAIL: optionalEmail,
 	STORAGE_DRIVER: z.enum(['memory', 'r2']),

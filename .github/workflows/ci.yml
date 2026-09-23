@@ -66,6 +66,7 @@ jobs:
             FIREBASE_PROJECT_ID: test-project
             FIREBASE_PRIVATE_KEY: '-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----'
             FIREBASE_CLIENT_EMAIL: test@test.iam.gserviceaccount.com
+            EMAIL_VERIFICATION_HMAC_SECRET: a-secure-test-secret-with-at-least-32-chars
             FIREBASE_WEB_API_KEY: fake-api-key
             SEND_EMAILS: 'false'
             MAIL_DRIVER: noop
@@ -87,6 +88,7 @@ jobs:
         env:
             FIREBASE_PROJECT_ID: demo-despertar-para-a-ciencia-api
             FIREBASE_CLIENT_EMAIL: test@test.iam.gserviceaccount.com
+            EMAIL_VERIFICATION_HMAC_SECRET: a-secure-test-secret-with-at-least-32-chars
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - uses: ./.github/actions/setup-node-pnpm

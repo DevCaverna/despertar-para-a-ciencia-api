@@ -35,6 +35,8 @@ export const authConfig = registerAs('auth', () => ({
 			'\n',
 		),
 		clientEmail: env.FIREBASE_CLIENT_EMAIL as string,
+		emailVerificationHmacSecret:
+			env.EMAIL_VERIFICATION_HMAC_SECRET as string,
 	},
 }));
 

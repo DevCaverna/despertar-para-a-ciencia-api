@@ -59,6 +59,7 @@ export interface AppConfig {
 			projectId: string;
 			privateKey: string;
 			clientEmail: string;
+			emailVerificationHmacSecret: string;
 		};
 	};
 	mail: MailConfig;

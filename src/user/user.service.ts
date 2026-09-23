@@ -1,4 +1,4 @@
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomInt } from 'node:crypto';
 
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
@@ -6,28 +6,36 @@ import {
 	ConflictException,
 	ForbiddenException,
 	Injectable,
+	Logger,
 	NotFoundException,
 	ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { I18nService } from 'nestjs-i18n';
 
 import { AuthService } from '../auth/application/auth.service.js';
 import type { AuthUser } from '../auth/domain/auth.types.js';
 import { UserRole } from '../auth/domain/user-role.js';
+import type { AppConfig } from '../config/config.types.js';
 import type { I18nTranslations } from '../generated/i18n.generated.js';
 import { MailService } from '../mail/application/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateProfileDto } from './dto/create-profile.dto.js';
 import type { User } from './models/user.model.js';
+import { VERIFY_EMAIL_CODE_SCRIPT } from './verify-email-code.script.js';
+
+const FIREBASE_BATCH_SIZE = 10;
 
 @Injectable()
 export class UserService {
 	private administrativeMutation = Promise.resolve();
+	private readonly logger = new Logger(UserService.name);
 
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly auth: AuthService,
+		private readonly config: ConfigService<AppConfig, true>,
 		private readonly i18n: I18nService<I18nTranslations>,
 		private readonly mail: MailService,
 		@InjectRedis() private readonly redis: Redis,
@@ -64,18 +72,18 @@ export class UserService {
 					name,
 					email: actorEmail,
 				});
-			} catch {
+			} catch (error) {
+				if (!this.isEmailUniqueViolation(error)) throw error;
 				user = await this.prisma.database.orm.public.User.where({
 					email: actorEmail,
 				}).first();
 				if (!user) {
-					throw new ConflictException(
-						this.i18n.t('errors.PROFILE_CREATION_FAILED'),
-					);
+					throw error;
 				}
 			}
 		}
 
+		await this.auth.markEmailVerified(actor.subject);
 		await this.auth.setUserClaims({
 			subject: actor.subject,
 			id: user.id,
@@ -87,21 +95,18 @@ export class UserService {
 	async sendEmailVerificationCode(email: string): Promise<void> {
 		const code = randomInt(100_000, 1_000_000).toString();
 		const expiresAt = Date.now() + 10 * 60_000;
-		await Promise.all([
-			this.redis.setex(
+		await this.redis
+			.multi()
+			.setex(
 				this.emailVerificationKey(email),
 				10 * 60,
 				JSON.stringify({
 					codeHash: this.hashVerificationCode(code),
 					expiresAt,
 				}),
-			),
-			this.redis.setex(
-				this.emailVerificationAttemptsKey(email),
-				10 * 60,
-				'0',
-			),
-		]);
+			)
+			.setex(this.emailVerificationAttemptsKey(email), 10 * 60, '0')
+			.exec();
 
 		await this.mail.sendTextEmail({
 			to: [{ email }],
@@ -133,7 +138,9 @@ export class UserService {
 		actor: AuthUser,
 		page: number,
 		perPage: number,
-	): Promise<Array<User & { roles: UserRole[] }>> {
+	): Promise<
+		Array<User & { roles: UserRole[]; authAccountExists: boolean }>
+	> {
 		await this.requireProfile(actor);
 		const users: User[] = [];
 		for await (const row of this.prisma.database.orm.public.User.orderBy(
@@ -144,13 +151,7 @@ export class UserService {
 			.all()) {
 			users.push(row);
 		}
-		return Promise.all(
-			users.map(async (user) => ({
-				...user,
-				roles:
-					(await this.auth.getUserByEmail(user.email))?.roles ?? [],
-			})),
-		);
+		return this.mapUsersWithAuthAccounts(users);
 	}
 
 	async updateRoles(
@@ -224,16 +225,27 @@ export class UserService {
 					id: user.id,
 				}).update({ active, updatedAt: new Date().toISOString() });
 			} catch (error) {
-				await (user.active
-					? this.auth.enableUser(authUser.subject)
-					: this.auth.disableUser(authUser.subject));
+				await this.compensateStatusChange({
+					authSubject: authUser.subject,
+					userId: user.id,
+					previousStatus: user.active,
+					desiredStatus: active,
+					primaryError: error,
+				});
 				throw error;
 			}
 			if (!updated) {
-				await (user.active
-					? this.auth.enableUser(authUser.subject)
-					: this.auth.disableUser(authUser.subject));
-				throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
+				const error = new NotFoundException(
+					this.i18n.t('errors.NOT_FOUND'),
+				);
+				await this.compensateStatusChange({
+					authSubject: authUser.subject,
+					userId: user.id,
+					previousStatus: user.active,
+					desiredStatus: active,
+					primaryError: error,
+				});
+				throw error;
 			}
 			await this.revokeSessionsWithRetry(authUser.subject);
 			return updated;
@@ -251,68 +263,20 @@ export class UserService {
 	}
 
 	private async verifyEmailCode(email: string, code: string): Promise<void> {
-		const key = this.emailVerificationKey(email);
-		const rawVerification = await this.redis.get(key);
-		let verification: { codeHash: string; expiresAt: number } | undefined;
-		try {
-			const parsed: unknown = rawVerification
-				? JSON.parse(rawVerification)
-				: undefined;
-			if (
-				typeof parsed === 'object' &&
-				parsed !== null &&
-				typeof (parsed as { codeHash?: unknown }).codeHash ===
-					'string' &&
-				typeof (parsed as { expiresAt?: unknown }).expiresAt ===
-					'number'
-			) {
-				verification = parsed as {
-					codeHash: string;
-					expiresAt: number;
-				};
-			}
-		} catch {
-			verification = undefined;
-		}
-
-		const attemptsKey = this.emailVerificationAttemptsKey(email);
-		const attempts = Number((await this.redis.get(attemptsKey)) ?? 0);
-		if (
-			!verification ||
-			attempts >= 5 ||
-			verification.expiresAt <= Date.now()
-		) {
-			throw new BadRequestException(
-				this.i18n.t('errors.EMAIL_VERIFICATION_CODE_INVALID'),
-			);
-		}
-
-		const expectedHash = Buffer.from(verification.codeHash, 'hex');
-		const suppliedHash = Buffer.from(
+		const result = await this.redis.eval(
+			VERIFY_EMAIL_CODE_SCRIPT,
+			2,
+			this.emailVerificationKey(email),
+			this.emailVerificationAttemptsKey(email),
 			this.hashVerificationCode(code),
-			'hex',
+			Date.now(),
+			5,
 		);
-		if (
-			expectedHash.length !== suppliedHash.length ||
-			!timingSafeEqual(expectedHash, suppliedHash)
-		) {
-			const nextAttempts = await this.redis.incr(attemptsKey);
-			if (nextAttempts === 1) {
-				await this.redis.expire(
-					attemptsKey,
-					Math.max(
-						1,
-						Math.ceil((verification.expiresAt - Date.now()) / 1000),
-					),
-				);
-			}
-			if (nextAttempts >= 5) await this.redis.del(key, attemptsKey);
+		if (result !== 1) {
 			throw new BadRequestException(
 				this.i18n.t('errors.EMAIL_VERIFICATION_CODE_INVALID'),
 			);
 		}
-
-		await this.redis.del(key, attemptsKey);
 	}
 
 	private emailVerificationKey(email: string): string {
@@ -324,7 +288,11 @@ export class UserService {
 	}
 
 	private hashVerificationCode(code: string): string {
-		return createHash('sha256').update(code).digest('hex');
+		const secret = this.config.getOrThrow(
+			'auth.firebase.emailVerificationHmacSecret',
+			{ infer: true },
+		);
+		return createHmac('sha256', secret).update(code).digest('hex');
 	}
 
 	private async requireUser(id: string): Promise<User> {
@@ -340,11 +308,107 @@ export class UserService {
 		}).all()) {
 			users.push(user);
 		}
-		const authUsers = await Promise.all(
-			users.map((user) => this.auth.getUserByEmail(user.email)),
-		);
-		return authUsers.filter((user) => user?.roles.includes(UserRole.ADMIN))
-			.length;
+		const usersWithAccounts = await this.mapUsersWithAuthAccounts(users);
+		return usersWithAccounts.filter((user) =>
+			user.roles.includes(UserRole.ADMIN),
+		).length;
+	}
+
+	private async mapUsersWithAuthAccounts(
+		users: User[],
+	): Promise<
+		Array<User & { roles: UserRole[]; authAccountExists: boolean }>
+	> {
+		const results: Array<
+			User & { roles: UserRole[]; authAccountExists: boolean }
+		> = [];
+		for (
+			let offset = 0;
+			offset < users.length;
+			offset += FIREBASE_BATCH_SIZE
+		) {
+			const batch = users.slice(offset, offset + FIREBASE_BATCH_SIZE);
+			let authUsers: Array<AuthUser | undefined>;
+			try {
+				// oxlint-disable-next-line no-await-in-loop -- Keep Firebase fan-out bounded to one batch at a time.
+				authUsers = await Promise.all(
+					batch.map((user) => this.auth.getUserByEmail(user.email)),
+				);
+			} catch (error) {
+				this.logger.error({
+					event: 'user_auth_listing_failed',
+					'user.batch_size': batch.length,
+					'error.type': this.errorType(error),
+				});
+				throw new ServiceUnavailableException(
+					this.i18n.t('errors.AUTH_ACCOUNT_LOOKUP_UNAVAILABLE'),
+				);
+			}
+			results.push(
+				...batch.map((user, index) => ({
+					...user,
+					roles: authUsers[index]?.roles ?? [],
+					authAccountExists: authUsers[index] !== undefined,
+				})),
+			);
+		}
+		return results;
+	}
+
+	private isEmailUniqueViolation(error: unknown): boolean {
+		let current: unknown = error;
+		while (typeof current === 'object' && current !== null) {
+			const candidate = current as {
+				code?: unknown;
+				constraint?: unknown;
+				cause?: unknown;
+			};
+			if (
+				candidate.code === '23505' &&
+				candidate.constraint === 'user_email_key'
+			) {
+				return true;
+			}
+			current = candidate.cause;
+		}
+		return false;
+	}
+
+	private async compensateStatusChange({
+		authSubject,
+		userId,
+		previousStatus,
+		desiredStatus,
+		primaryError,
+	}: {
+		authSubject: string;
+		userId: string;
+		previousStatus: boolean;
+		desiredStatus: boolean;
+		primaryError: unknown;
+	}): Promise<void> {
+		try {
+			await (previousStatus
+				? this.auth.enableUser(authSubject)
+				: this.auth.disableUser(authSubject));
+		} catch (compensationError) {
+			this.logger.error({
+				event: 'user_status_compensation_failed',
+				'user.id': userId,
+				'auth.subject': authSubject,
+				'auth.previous_status': previousStatus,
+				'auth.desired_status': desiredStatus,
+				'error.primary_type': this.errorType(primaryError),
+				'error.compensation_type': this.errorType(compensationError),
+			});
+			throw new ServiceUnavailableException(
+				this.i18n.t('errors.USER_STATUS_RECONCILIATION_REQUIRED'),
+			);
+		}
+	}
+
+	private errorType(error: unknown): string {
+		return error instanceof Error ? error.constructor.name : 'UnknownError';
 	}
 
 	private async withAdministrativeMutex<T>(
