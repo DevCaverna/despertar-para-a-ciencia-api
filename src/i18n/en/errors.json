@@ -10,6 +10,6 @@
 	"VERIFIED_EMAIL_REQUIRED": "A verified email address is required",
 	"NAME_REQUIRED": "Name is required",
 	"PROFILE_EMAIL_MISMATCH": "The profile email must match the authenticated email",
-	"EMAIL_ALREADY_REGISTERED": "This email already has a profile",
+	"SESSION_REVOCATION_PENDING": "Unable to confirm session revocation. Please try again.",
 	"EMAIL_VERIFICATION_CODE_INVALID": "The verification code is invalid or expired"
 }

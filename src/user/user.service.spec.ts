@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+	BadRequestException,
+	ForbiddenException,
+	ServiceUnavailableException,
+} from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mockAdmin, mockUser } from '../../test/mocks/auth.mock.js';
@@ -89,8 +93,17 @@ describe('UserService', () => {
 		);
 	});
 
-	it('reconciles a repeated onboarding request without creating another profile', async () => {
+	it('reconciles an existing profile after verifying the email code', async () => {
 		users.findByEmail.mockResolvedValue(profile);
+		redis.get
+			.mockResolvedValueOnce(
+				JSON.stringify({
+					codeHash:
+						'8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+					expiresAt: Date.now() + 600_000,
+				}),
+			)
+			.mockResolvedValueOnce('0');
 
 		await expect(
 			service.createProfile(
@@ -103,6 +116,41 @@ describe('UserService', () => {
 			),
 		).resolves.toEqual(profile);
 		expect(users.create).not.toHaveBeenCalled();
+		expect(auth.setUserClaims).toHaveBeenCalledWith({
+			subject: 'test-subject',
+			id: profile.id,
+			roles: [UserRole.USER],
+		});
+		expect(redis.del).toHaveBeenCalledWith(
+			'email-verification-code:ada@example.com',
+			'email-verification-code:ada@example.com:attempts',
+		);
+	});
+
+	it('does not reconcile an existing profile without a valid email code', async () => {
+		users.findByEmail.mockResolvedValue(profile);
+		redis.get
+			.mockResolvedValueOnce(
+				JSON.stringify({
+					codeHash:
+						'8d969eef6ec3d29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+					expiresAt: Date.now() + 600_000,
+				}),
+			)
+			.mockResolvedValueOnce('0');
+		redis.incr.mockResolvedValue(1);
+
+		await expect(
+			service.createProfile(
+				mockUser({ id: undefined, email: profile.email }),
+				{
+					name: 'Other',
+					email: profile.email,
+					code: '000000',
+				},
+			),
+		).rejects.toThrow(BadRequestException);
+		expect(auth.setUserClaims).not.toHaveBeenCalled();
 	});
 
 	it('rejects a profile email that differs from the authenticated email', async () => {
@@ -166,9 +214,22 @@ describe('UserService', () => {
 		);
 	});
 
+	it('sends a verification code for an email with an existing profile', async () => {
+		users.findByEmail.mockResolvedValue(profile);
+		redis.setex.mockResolvedValue(undefined);
+
+		await service.sendEmailVerificationCode(profile.email);
+
+		expect(redis.setex).toHaveBeenCalledTimes(2);
+		expect(mail.sendTextEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ to: [{ email: profile.email }] }),
+		);
+	});
+
 	it('does not remove the last active administrator', async () => {
-		users.findById.mockResolvedValue(profile);
-		users.findAllActive.mockReturnValue([profile]);
+		const adminProfile = { ...profile, roles: [UserRole.ADMIN] };
+		users.findById.mockResolvedValue(adminProfile);
+		users.findAllActive.mockReturnValue([adminProfile]);
 		auth.getUserByEmail.mockResolvedValue(
 			mockAdmin({
 				email: profile.email,
@@ -182,5 +243,42 @@ describe('UserService', () => {
 			]),
 		).rejects.toThrow(BadRequestException);
 		expect(auth.setUserClaims).not.toHaveBeenCalled();
+	});
+
+	it('retries session revocation once after a transient failure', async () => {
+		users.findById.mockResolvedValue(profile);
+		auth.getUserByEmail.mockResolvedValue(
+			mockUser({ email: profile.email, roles: [UserRole.USER] }),
+		);
+		auth.revokeSessions
+			.mockRejectedValueOnce(new Error('temporary failure'))
+			.mockResolvedValueOnce(undefined);
+
+		await expect(
+			service.updateRoles(mockAdmin({ id: profile.id }), profile.id, [
+				UserRole.USER,
+			]),
+		).resolves.toEqual(profile);
+		expect(auth.revokeSessions).toHaveBeenCalledTimes(2);
+	});
+
+	it('returns service unavailable when session revocation keeps failing', async () => {
+		users.findById.mockResolvedValue(profile);
+		auth.getUserByEmail.mockResolvedValue(
+			mockUser({ email: profile.email, roles: [UserRole.USER] }),
+		);
+		auth.revokeSessions.mockRejectedValue(
+			new Error('Firebase unavailable'),
+		);
+
+		await expect(
+			service.updateRoles(mockAdmin({ id: profile.id }), profile.id, [
+				UserRole.USER,
+			]),
+		).rejects.toThrow(ServiceUnavailableException);
+		expect(auth.revokeSessions).toHaveBeenCalledTimes(2);
+		expect(i18n.t).toHaveBeenCalledWith(
+			'errors.SESSION_REVOCATION_PENDING',
+		);
 	});
 });

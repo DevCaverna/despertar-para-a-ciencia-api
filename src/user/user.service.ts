@@ -7,6 +7,7 @@ import {
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
+	ServiceUnavailableException,
 } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { I18nService } from 'nestjs-i18n';
@@ -22,6 +23,8 @@ import type { User } from './models/user.model.js';
 
 @Injectable()
 export class UserService {
+	private administrativeMutation = Promise.resolve();
+
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly auth: AuthService,
@@ -51,11 +54,11 @@ export class UserService {
 			);
 		}
 
+		await this.verifyEmailCode(actorEmail, code);
 		let user = await this.prisma.database.orm.public.User.where({
 			email: actorEmail,
 		}).first();
 		if (!user) {
-			await this.verifyEmailCode(actorEmail, code);
 			try {
 				user = await this.prisma.database.orm.public.User.create({
 					name,
@@ -82,15 +85,6 @@ export class UserService {
 	}
 
 	async sendEmailVerificationCode(email: string): Promise<void> {
-		const exists = await this.prisma.database.orm.public.User.where({
-			email,
-		}).first();
-		if (exists) {
-			throw new ConflictException(
-				this.i18n.t('errors.EMAIL_ALREADY_REGISTERED'),
-			);
-		}
-
 		const code = randomInt(100_000, 1_000_000).toString();
 		const expiresAt = Date.now() + 10 * 60_000;
 		await Promise.all([
@@ -174,23 +168,25 @@ export class UserService {
 		}
 
 		const normalizedRoles = [...new Set(roles)];
-		if (
-			authUser.roles.includes(UserRole.ADMIN) &&
-			!normalizedRoles.includes(UserRole.ADMIN) &&
-			(await this.countActiveAdministrators()) <= 1
-		) {
-			throw new BadRequestException(
-				this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
-			);
-		}
-
-		await this.auth.setUserClaims({
-			subject: authUser.subject,
-			id: user.id,
-			roles: normalizedRoles,
+		return this.withAdministrativeMutex(async () => {
+			if (
+				user.active &&
+				authUser.roles.includes(UserRole.ADMIN) &&
+				!normalizedRoles.includes(UserRole.ADMIN) &&
+				(await this.countActiveAdministrators()) <= 1
+			) {
+				throw new BadRequestException(
+					this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
+				);
+			}
+			await this.auth.setUserClaims({
+				subject: authUser.subject,
+				id: user.id,
+				roles: normalizedRoles,
+			});
+			await this.revokeSessionsWithRetry(authUser.subject);
+			return user;
 		});
-		await this.auth.revokeSessions(authUser.subject);
-		return user;
 	}
 
 	async updateStatus(
@@ -207,39 +203,41 @@ export class UserService {
 			);
 		}
 
-		if (
-			!active &&
-			authUser.roles.includes(UserRole.ADMIN) &&
-			(await this.countActiveAdministrators()) <= 1
-		) {
-			throw new BadRequestException(
-				this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
-			);
-		}
+		return this.withAdministrativeMutex(async () => {
+			if (
+				!active &&
+				authUser.roles.includes(UserRole.ADMIN) &&
+				(await this.countActiveAdministrators()) <= 1
+			) {
+				throw new BadRequestException(
+					this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
+				);
+			}
 
-		const setUserStatus = active
-			? this.auth.enableUser.bind(this.auth)
-			: this.auth.disableUser.bind(this.auth);
-		await setUserStatus(authUser.subject);
-		let updated: User | null;
-		try {
-			updated = await this.prisma.database.orm.public.User.where({
-				id: user.id,
-			}).update({ active, updatedAt: new Date().toISOString() });
-		} catch (error) {
-			await (user.active
-				? this.auth.enableUser(authUser.subject)
-				: this.auth.disableUser(authUser.subject));
-			throw error;
-		}
-		if (!updated) {
-			await (user.active
-				? this.auth.enableUser(authUser.subject)
-				: this.auth.disableUser(authUser.subject));
-			throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
-		}
-		await this.auth.revokeSessions(authUser.subject);
-		return updated;
+			const setUserStatus = active
+				? this.auth.enableUser.bind(this.auth)
+				: this.auth.disableUser.bind(this.auth);
+			await setUserStatus(authUser.subject);
+			let updated: User | null;
+			try {
+				updated = await this.prisma.database.orm.public.User.where({
+					id: user.id,
+				}).update({ active, updatedAt: new Date().toISOString() });
+			} catch (error) {
+				await (user.active
+					? this.auth.enableUser(authUser.subject)
+					: this.auth.disableUser(authUser.subject));
+				throw error;
+			}
+			if (!updated) {
+				await (user.active
+					? this.auth.enableUser(authUser.subject)
+					: this.auth.disableUser(authUser.subject));
+				throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
+			}
+			await this.revokeSessionsWithRetry(authUser.subject);
+			return updated;
+		});
 	}
 
 	private async requireProfile(actor: AuthUser): Promise<User> {
@@ -347,5 +345,35 @@ export class UserService {
 		);
 		return authUsers.filter((user) => user?.roles.includes(UserRole.ADMIN))
 			.length;
+	}
+
+	private async withAdministrativeMutex<T>(
+		work: () => Promise<T>,
+	): Promise<T> {
+		const previous = this.administrativeMutation;
+		let release!: () => void;
+		this.administrativeMutation = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await previous;
+		try {
+			return await work();
+		} finally {
+			release();
+		}
+	}
+
+	private async revokeSessionsWithRetry(subject: string): Promise<void> {
+		for (let attempt = 0; attempt < 2; attempt += 1) {
+			try {
+				// The second attempt must wait for the first result.
+				// oxlint-disable-next-line no-await-in-loop
+				await this.auth.revokeSessions(subject);
+				return;
+			} catch {}
+		}
+		throw new ServiceUnavailableException(
+			this.i18n.t('errors.SESSION_REVOCATION_PENDING'),
+		);
 	}
 }

@@ -21,7 +21,7 @@ export type I18nTranslations = {
         "VERIFIED_EMAIL_REQUIRED": string;
         "NAME_REQUIRED": string;
         "PROFILE_EMAIL_MISMATCH": string;
-        "EMAIL_ALREADY_REGISTERED": string;
+        "SESSION_REVOCATION_PENDING": string;
         "EMAIL_VERIFICATION_CODE_INVALID": string;
     };
     "fields": {

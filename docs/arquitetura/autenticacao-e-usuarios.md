@@ -19,11 +19,11 @@ Claims com papéis desconhecidos ou malformados não concedem acesso. Alteraçõ
 
 ## Perfil autenticado
 
-O onboarding exige Firebase ID Token. Antes de criar o perfil, o cliente solicita um código por e-mail e o confirma no mesmo e-mail presente no token. A API guarda somente o hash do código no Redis, por até dez minutos e com no máximo cinco tentativas; códigos não são persistidos no PostgreSQL. `POST /users/profile` aceita `name`, `email` e `code`, cria ou reconcilia o perfil pelo e-mail normalizado e grava seu `id` como custom claim no Firebase. O cliente deve executar `getIdToken(true)` antes de chamar rotas que dependem da claim nova.
+O onboarding exige Firebase ID Token. Antes de criar ou reconciliar o perfil, o cliente solicita um código por e-mail e o confirma no mesmo e-mail presente no token. A API guarda somente o hash do código no Redis, por até dez minutos e com no máximo cinco tentativas; códigos não são persistidos no PostgreSQL. `POST /users/profile` aceita `name`, `email` e `code`: para um token sem vínculo local, o código é obrigatório mesmo quando já existe um perfil para o e-mail; somente a repetição de uma operação com a claim `id` já vinculada dispensa nova confirmação. O endpoint grava o `id` como custom claim no Firebase. O cliente deve executar `getIdToken(true)` antes de chamar rotas que dependem da claim nova.
 
 | Método  | Rota                                  | Comportamento                                          |
 | ------- | ------------------------------------- | ------------------------------------------------------ |
-| `POST`  | `/users/send-email-verification-code` | Envia código temporário para novo e-mail.              |
+| `POST`  | `/users/send-email-verification-code` | Envia código temporário para criação ou reconciliação. |
 | `POST`  | `/users/profile`                      | Cria ou reconcilia o perfil autenticado.               |
 | `GET`   | `/users/profile`                      | Retorna o perfil autenticado e ativo.                  |
 | `PATCH` | `/users/profile`                      | Atualiza somente o nome do perfil autenticado e ativo. |
@@ -38,7 +38,7 @@ As rotas abaixo exigem `ADMIN` e perfil local ativo:
 | `PATCH` | `/users/:id/roles`  | Substitui o conjunto de papéis do perfil.                  |
 | `PATCH` | `/users/:id/status` | Ativa ou desativa o perfil e a conta Firebase.             |
 
-A API não permite remover ou desativar o último administrador ativo.
+A API não permite remover ou desativar o último administrador ativo. Alterações administrativas são serializadas por um mutex local da instância da API; essa proteção reduz corridas dentro da instância, sem pretender oferecer lock distribuído.
 
 ## Primeiro administrador
 

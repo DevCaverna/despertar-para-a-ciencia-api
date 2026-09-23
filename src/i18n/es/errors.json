@@ -10,6 +10,6 @@
 	"VERIFIED_EMAIL_REQUIRED": "Se requiere una dirección de correo electrónico verificada",
 	"NAME_REQUIRED": "El nombre es obligatorio",
 	"PROFILE_EMAIL_MISMATCH": "El correo electrónico del perfil debe coincidir con el correo autenticado",
-	"EMAIL_ALREADY_REGISTERED": "Este correo electrónico ya tiene un perfil",
+	"SESSION_REVOCATION_PENDING": "No se pudo confirmar la revocación de las sesiones. Inténtalo de nuevo.",
 	"EMAIL_VERIFICATION_CODE_INVALID": "El código de verificación es inválido o caducó"
 }
