@@ -74,7 +74,7 @@ export class UserService {
 		}
 
 		await this.auth.setUserClaims({
-			firebaseUid: actor.firebaseUid,
+			subject: actor.subject,
 			id: user.id,
 			roles: actor.roles.length > 0 ? actor.roles : [UserRole.USER],
 		});
@@ -166,16 +166,16 @@ export class UserService {
 	): Promise<User> {
 		await this.requireProfile(actor);
 		const user = await this.requireUser(userId);
-		const firebaseUser = await this.auth.getUserByEmail(user.email);
-		if (!firebaseUser) {
+		const authUser = await this.auth.getUserByEmail(user.email);
+		if (!authUser) {
 			throw new ConflictException(
-				this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
+				this.i18n.t('errors.AUTH_ACCOUNT_NOT_FOUND'),
 			);
 		}
 
 		const normalizedRoles = [...new Set(roles)];
 		if (
-			firebaseUser.roles.includes(UserRole.ADMIN) &&
+			authUser.roles.includes(UserRole.ADMIN) &&
 			!normalizedRoles.includes(UserRole.ADMIN) &&
 			(await this.countActiveAdministrators()) <= 1
 		) {
@@ -185,11 +185,11 @@ export class UserService {
 		}
 
 		await this.auth.setUserClaims({
-			firebaseUid: firebaseUser.firebaseUid,
+			subject: authUser.subject,
 			id: user.id,
 			roles: normalizedRoles,
 		});
-		await this.auth.revokeSessions(firebaseUser.firebaseUid);
+		await this.auth.revokeSessions(authUser.subject);
 		return user;
 	}
 
@@ -200,16 +200,16 @@ export class UserService {
 	): Promise<User> {
 		await this.requireProfile(actor);
 		const user = await this.requireUser(userId);
-		const firebaseUser = await this.auth.getUserByEmail(user.email);
-		if (!firebaseUser) {
+		const authUser = await this.auth.getUserByEmail(user.email);
+		if (!authUser) {
 			throw new ConflictException(
-				this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
+				this.i18n.t('errors.AUTH_ACCOUNT_NOT_FOUND'),
 			);
 		}
 
 		if (
 			!active &&
-			firebaseUser.roles.includes(UserRole.ADMIN) &&
+			authUser.roles.includes(UserRole.ADMIN) &&
 			(await this.countActiveAdministrators()) <= 1
 		) {
 			throw new BadRequestException(
@@ -220,7 +220,7 @@ export class UserService {
 		const setUserStatus = active
 			? this.auth.enableUser.bind(this.auth)
 			: this.auth.disableUser.bind(this.auth);
-		await setUserStatus(firebaseUser.firebaseUid);
+		await setUserStatus(authUser.subject);
 		let updated: User | null;
 		try {
 			updated = await this.prisma.database.orm.public.User.where({
@@ -228,17 +228,17 @@ export class UserService {
 			}).update({ active, updatedAt: new Date().toISOString() });
 		} catch (error) {
 			await (user.active
-				? this.auth.enableUser(firebaseUser.firebaseUid)
-				: this.auth.disableUser(firebaseUser.firebaseUid));
+				? this.auth.enableUser(authUser.subject)
+				: this.auth.disableUser(authUser.subject));
 			throw error;
 		}
 		if (!updated) {
 			await (user.active
-				? this.auth.enableUser(firebaseUser.firebaseUid)
-				: this.auth.disableUser(firebaseUser.firebaseUid));
+				? this.auth.enableUser(authUser.subject)
+				: this.auth.disableUser(authUser.subject));
 			throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
 		}
-		await this.auth.revokeSessions(firebaseUser.firebaseUid);
+		await this.auth.revokeSessions(authUser.subject);
 		return updated;
 	}
 
@@ -342,11 +342,10 @@ export class UserService {
 		}).all()) {
 			users.push(user);
 		}
-		const firebaseUsers = await Promise.all(
+		const authUsers = await Promise.all(
 			users.map((user) => this.auth.getUserByEmail(user.email)),
 		);
-		return firebaseUsers.filter((user) =>
-			user?.roles.includes(UserRole.ADMIN),
-		).length;
+		return authUsers.filter((user) => user?.roles.includes(UserRole.ADMIN))
+			.length;
 	}
 }

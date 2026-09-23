@@ -79,7 +79,7 @@ describe('UserService', () => {
 			email: 'ada@example.com',
 		});
 		expect(auth.setUserClaims).toHaveBeenCalledWith({
-			firebaseUid: 'test-firebase-uid',
+			subject: 'test-subject',
 			id: profile.id,
 			roles: [UserRole.USER],
 		});
@@ -172,7 +172,7 @@ describe('UserService', () => {
 		auth.getUserByEmail.mockResolvedValue(
 			mockAdmin({
 				email: profile.email,
-				firebaseUid: 'admin-firebase-uid',
+				subject: 'admin-subject',
 			}),
 		);
 

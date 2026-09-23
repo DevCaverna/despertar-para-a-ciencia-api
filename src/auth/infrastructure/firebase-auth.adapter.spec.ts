@@ -61,12 +61,11 @@ describe('FirebaseAuthAdapter', () => {
 		});
 
 		await expect(adapter.validateToken('valid-token')).resolves.toEqual({
-			firebaseUid: 'firebase-uid',
+			subject: 'firebase-uid',
 			id: 'profile-id',
 			email: 'user@example.com',
 			emailVerified: true,
 			roles: [UserRole.ADMIN],
-			provider: 'firebase',
 		});
 	});
 
@@ -78,7 +77,7 @@ describe('FirebaseAuthAdapter', () => {
 		});
 
 		await adapter.setUserClaims({
-			firebaseUid: 'user-id',
+			subject: 'user-id',
 			roles: [UserRole.ADMIN],
 		});
 

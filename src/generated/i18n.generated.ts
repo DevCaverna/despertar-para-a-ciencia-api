@@ -16,7 +16,7 @@ export type I18nTranslations = {
         "ERROR_SENDING_EMAIL": string;
         "PROFILE_CLAIM_INVALID": string;
         "PROFILE_CREATION_FAILED": string;
-        "FIREBASE_ACCOUNT_NOT_FOUND": string;
+        "AUTH_ACCOUNT_NOT_FOUND": string;
         "LAST_ACTIVE_ADMINISTRATOR": string;
         "VERIFIED_EMAIL_REQUIRED": string;
         "NAME_REQUIRED": string;

@@ -12,8 +12,8 @@ export class AuthService {
 		return this.auth.validateToken(token);
 	}
 
-	getUserByUid(firebaseUid: string): Promise<AuthUser | undefined> {
-		return this.auth.getUserByUid(firebaseUid);
+	getUserBySubject(subject: string): Promise<AuthUser | undefined> {
+		return this.auth.getUserBySubject(subject);
 	}
 
 	getUserByEmail(email: string): Promise<AuthUser | undefined> {
@@ -21,22 +21,22 @@ export class AuthService {
 	}
 
 	setUserClaims(input: {
-		firebaseUid: string;
+		subject: string;
 		id?: string;
 		roles: UserRole[];
 	}): Promise<void> {
 		return this.auth.setUserClaims(input);
 	}
 
-	enableUser(firebaseUid: string): Promise<void> {
-		return this.auth.enableUser(firebaseUid);
+	enableUser(subject: string): Promise<void> {
+		return this.auth.enableUser(subject);
 	}
 
-	disableUser(firebaseUid: string): Promise<void> {
-		return this.auth.disableUser(firebaseUid);
+	disableUser(subject: string): Promise<void> {
+		return this.auth.disableUser(subject);
 	}
 
-	revokeSessions(firebaseUid: string): Promise<void> {
-		return this.auth.revokeSessions(firebaseUid);
+	revokeSessions(subject: string): Promise<void> {
+		return this.auth.revokeSessions(subject);
 	}
 }

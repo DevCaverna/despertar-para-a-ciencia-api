@@ -5,7 +5,7 @@
 	"ERROR_SENDING_EMAIL": "Error al enviar el correo electrónico",
 	"PROFILE_CLAIM_INVALID": "El identificador del perfil no es válido",
 	"PROFILE_CREATION_FAILED": "No se pudo crear el perfil",
-	"FIREBASE_ACCOUNT_NOT_FOUND": "No se encontró la cuenta de Firebase",
+	"AUTH_ACCOUNT_NOT_FOUND": "No se encontró la cuenta de autenticación",
 	"LAST_ACTIVE_ADMINISTRATOR": "No se puede cambiar el último administrador activo",
 	"VERIFIED_EMAIL_REQUIRED": "Se requiere una dirección de correo electrónico verificada",
 	"NAME_REQUIRED": "El nombre es obligatorio",

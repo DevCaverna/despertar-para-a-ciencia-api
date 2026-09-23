@@ -48,7 +48,7 @@ export class FirebaseAuthAdapter implements AuthPort {
 				const decoded = await getAuth().verifyIdToken(token, true);
 
 				return this.toAuthUser({
-					firebaseUid: decoded.uid,
+					subject: decoded.uid,
 					email: decoded.email,
 					emailVerified: decoded.email_verified,
 					customClaims: decoded,
@@ -57,14 +57,14 @@ export class FirebaseAuthAdapter implements AuthPort {
 		});
 	}
 
-	async getUserByUid(firebaseUid: string): Promise<AuthUser | undefined> {
+	async getUserBySubject(subject: string): Promise<AuthUser | undefined> {
 		return measureDependency({
 			dependency: 'firebase',
 			operation: 'get_user',
 			work: async () => {
 				try {
 					return this.toAuthUserFromRecord(
-						await getAuth().getUser(firebaseUid),
+						await getAuth().getUser(subject),
 					);
 				} catch (error) {
 					if (
@@ -104,11 +104,11 @@ export class FirebaseAuthAdapter implements AuthPort {
 	}
 
 	async setUserClaims({
-		firebaseUid,
+		subject,
 		id,
 		roles,
 	}: {
-		firebaseUid: string;
+		subject: string;
 		id?: string;
 		roles: UserRole[];
 	}): Promise<void> {
@@ -116,10 +116,9 @@ export class FirebaseAuthAdapter implements AuthPort {
 			dependency: 'firebase',
 			operation: 'roles',
 			work: async () => {
-				const { customClaims = {} } =
-					await getAuth().getUser(firebaseUid);
+				const { customClaims = {} } = await getAuth().getUser(subject);
 
-				await getAuth().setCustomUserClaims(firebaseUid, {
+				await getAuth().setCustomUserClaims(subject, {
 					...customClaims,
 					...(id ? { id } : {}),
 					roles: this.normalizeRoles(roles),
@@ -128,39 +127,39 @@ export class FirebaseAuthAdapter implements AuthPort {
 		});
 	}
 
-	async enableUser(firebaseUid: string): Promise<void> {
+	async enableUser(subject: string): Promise<void> {
 		return measureDependency({
 			dependency: 'firebase',
 			operation: 'enable_user',
 			work: async () => {
-				await getAuth().updateUser(firebaseUid, { disabled: false });
+				await getAuth().updateUser(subject, { disabled: false });
 			},
 		});
 	}
 
-	async disableUser(firebaseUid: string): Promise<void> {
+	async disableUser(subject: string): Promise<void> {
 		return measureDependency({
 			dependency: 'firebase',
 			operation: 'disable_user',
 			work: async () => {
-				await getAuth().updateUser(firebaseUid, { disabled: true });
+				await getAuth().updateUser(subject, { disabled: true });
 			},
 		});
 	}
 
-	async revokeSessions(firebaseUid: string): Promise<void> {
+	async revokeSessions(subject: string): Promise<void> {
 		return measureDependency({
 			dependency: 'firebase',
 			operation: 'revoke_sessions',
 			work: async () => {
-				await getAuth().revokeRefreshTokens(firebaseUid);
+				await getAuth().revokeRefreshTokens(subject);
 			},
 		});
 	}
 
 	private toAuthUserFromRecord(user: UserRecord): AuthUser {
 		return this.toAuthUser({
-			firebaseUid: user.uid,
+			subject: user.uid,
 			email: user.email,
 			emailVerified: user.emailVerified,
 			customClaims: user.customClaims,
@@ -168,25 +167,24 @@ export class FirebaseAuthAdapter implements AuthPort {
 	}
 
 	private toAuthUser({
-		firebaseUid,
+		subject,
 		email,
 		emailVerified,
 		customClaims,
 	}: {
-		firebaseUid: string;
+		subject: string;
 		email?: string;
 		emailVerified?: boolean;
 		customClaims?: Record<string, unknown>;
 	}): AuthUser {
 		return {
-			firebaseUid,
+			subject,
 			...(typeof customClaims?.id === 'string'
 				? { id: customClaims.id }
 				: {}),
 			email: email ?? '',
 			emailVerified: emailVerified ?? false,
 			roles: this.normalizeRoles(customClaims?.roles),
-			provider: 'firebase',
 		};
 	}
 

@@ -74,11 +74,10 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		const user = await adapter.validateToken(await signIn());
 
 		expect(user).toMatchObject({
-			firebaseUid: uid,
+			subject: uid,
 			id: 'application-user-id',
 			email,
 			roles: [UserRole.ADMIN],
-			provider: 'firebase',
 		});
 	});
 
