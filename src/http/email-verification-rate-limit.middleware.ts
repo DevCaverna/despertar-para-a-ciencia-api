@@ -26,13 +26,14 @@ export class EmailVerificationRateLimitMiddleware implements NestMiddleware {
 		const clientIp =
 			request.ip ?? request.socket.remoteAddress ?? 'unknown';
 		const keys = [`rate-limit:email-verification:ip:${clientIp}`];
-		const email = request.body?.email;
+		const rawEmail = request.body?.email;
+		const email = typeof rawEmail === 'string' ? rawEmail.trim() : rawEmail;
 		if (
 			typeof email === 'string' &&
 			email.length <= 254 &&
 			/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 		) {
-			const normalizedEmail = email.trim().toLowerCase();
+			const normalizedEmail = email.toLowerCase();
 			const secret = this.config.getOrThrow(
 				'auth.firebase.emailVerificationHmacSecret',
 				{ infer: true },

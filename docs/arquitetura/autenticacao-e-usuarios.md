@@ -15,7 +15,7 @@ As custom claims administradas pela API são:
 | `id`    | UUID v7 do perfil local no PostgreSQL.                      |
 | `roles` | Lista efetiva de papéis: `USER`, `COLLABORATOR` ou `ADMIN`. |
 
-Claims com papéis desconhecidos ou malformados não concedem acesso. Alterações de papéis preservam outras claims existentes e exigem renovação da sessão no cliente. Para redução de privilégios, a API revoga as sessões Firebase.
+Claims com papéis desconhecidos ou malformados não concedem acesso. Alterações de papéis preservam outras claims existentes e exigem renovação da sessão no cliente. Para redução de privilégios, a API revoga as sessões Firebase antes de atualizar as claims; se a revogação falhar após duas tentativas, as claims não são reduzidas e a API retorna `503`.
 
 ## Perfil autenticado
 

@@ -11,9 +11,9 @@ A API é publicada somente em `127.0.0.1:$PORT`; um proxy reverso gerenciado sep
 ## Procedimento de deploy
 
 1. O runner valida assinatura, attestation, digest e source SHA, salva a imagem OCI e a transfere por SSH.
-2. O runner envia `runtime.env`, `migration.env` e o script de deploy para um diretório remoto temporário; a VPS não retém esses arquivos.
-3. O script serializa deploys por ambiente com `flock`, valida separadamente os ambientes runtime e migration e verifica que usam usuários PostgreSQL distintos, sem exigir endpoints iguais. Somente depois executa `migration status`, `db migrate` e `db verify`.
-4. Um contêiner candidato inicia com filesystem somente leitura e `/tmp` em tmpfs. Ele precisa responder a `GET /health/ready` em até 30 tentativas.
+2. O runner cria `runtime.env` por allowlist e envia esse arquivo e o script de deploy para um diretório remoto temporário; a VPS remove o diretório ao final. A migration usa `DATABASE_URL` desse mesmo ambiente runtime.
+3. O script serializa deploys por ambiente com `flock`, valida as variáveis runtime e executa `prisma migration status`, `prisma db migrate` e `prisma db verify` antes de iniciar a aplicação.
+4. Um contêiner candidato inicia com filesystem somente leitura e `/tmp` em tmpfs. Ele precisa responder a `GET /health/ready` em até 30 tentativas; readiness verifica PostgreSQL e Redis.
 5. Após a aprovação do candidato, o contêiner ativo é substituído por outro com a mesma imagem, reinício `unless-stopped`, filesystem somente leitura e porta em loopback. O host preserva as tags `active` e `previous` do ambiente para execução atual e rollback imediato; ao fim de um deploy bem-sucedido, remove somente imagens dangling com o label OCI da aplicação.
 
 ## Falha e recuperação

@@ -180,12 +180,18 @@ export class UserService {
 					this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
 				);
 			}
+			const removesRole = authUser.roles.some(
+				(role) => !normalizedRoles.includes(role),
+			);
+			if (removesRole)
+				await this.revokeSessionsWithRetry(authUser.subject);
 			await this.auth.setUserClaims({
 				subject: authUser.subject,
 				id: user.id,
 				roles: normalizedRoles,
 			});
-			await this.revokeSessionsWithRetry(authUser.subject);
+			if (!removesRole)
+				await this.revokeSessionsWithRetry(authUser.subject);
 			return user;
 		});
 	}
@@ -259,6 +265,8 @@ export class UserService {
 			id: actor.id,
 		});
 		if (!user) throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
+		if (!user.active)
+			throw new ForbiddenException(this.i18n.t('errors.FORBIDDEN'));
 		return user;
 	}
 

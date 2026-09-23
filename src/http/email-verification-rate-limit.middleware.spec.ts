@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import type { NextFunction, Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -96,5 +98,28 @@ describe('EmailVerificationRateLimitMiddleware', () => {
 
 		expect(next).toHaveBeenCalledTimes(3);
 		expect(status).toHaveBeenCalledWith(429);
+	});
+
+	it('applies recipient limiting to email with surrounding whitespace', async () => {
+		const { middleware, redis, response } = setup();
+		const next = vi.fn() as NextFunction;
+
+		await middleware.use(
+			request('203.0.113.42', '  Ada@Example.com  '),
+			response,
+			next,
+		);
+
+		expect(redis.incr).toHaveBeenCalledTimes(2);
+		const expectedDigest = createHmac(
+			'sha256',
+			'a-secure-test-secret-with-at-least-32-chars',
+		)
+			.update('ada@example.com')
+			.digest('hex');
+		expect(redis.incr.mock.calls[1]?.[0]).toBe(
+			`rate-limit:email-verification:email:${expectedDigest}`,
+		);
+		expect(next).toHaveBeenCalledOnce();
 	});
 });

@@ -383,6 +383,54 @@ describe('UserService', () => {
 		expect(auth.revokeSessions).toHaveBeenCalledTimes(2);
 	});
 
+	it('revokes sessions before applying reduced roles', async () => {
+		const order: string[] = [];
+		users.findById.mockResolvedValue(profile);
+		auth.getUserByEmail.mockResolvedValue(
+			mockUser({
+				email: profile.email,
+				subject: 'admin-subject',
+				roles: [UserRole.USER, UserRole.COLLABORATOR],
+			}),
+		);
+		auth.revokeSessions.mockImplementation(() => {
+			order.push('revoke');
+		});
+		auth.setUserClaims.mockImplementation(() => {
+			order.push('claims');
+		});
+
+		await service.updateRoles(mockAdmin(), profile.id, [UserRole.USER]);
+
+		expect(order).toEqual(['revoke', 'claims']);
+	});
+
+	it('does not apply reduced roles when session revocation fails', async () => {
+		users.findById.mockResolvedValue(profile);
+		auth.getUserByEmail.mockResolvedValue(
+			mockUser({
+				email: profile.email,
+				roles: [UserRole.USER, UserRole.COLLABORATOR],
+			}),
+		);
+		auth.revokeSessions.mockRejectedValue(
+			new Error('Firebase unavailable'),
+		);
+
+		await expect(
+			service.updateRoles(mockAdmin(), profile.id, [UserRole.USER]),
+		).rejects.toThrow(ServiceUnavailableException);
+		expect(auth.setUserClaims).not.toHaveBeenCalled();
+	});
+
+	it('rejects administrative access for an inactive local profile', async () => {
+		users.findById.mockResolvedValue({ ...profile, active: false });
+
+		await expect(service.listUsers(mockAdmin(), 1, 20)).rejects.toThrow(
+			ForbiddenException,
+		);
+	});
+
 	it('returns service unavailable when session revocation keeps failing', async () => {
 		users.findById.mockResolvedValue(profile);
 		auth.getUserByEmail.mockResolvedValue(

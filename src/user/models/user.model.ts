@@ -26,4 +26,10 @@ export class UserModel implements User {
 
 	@ApiProperty({ enum: UserRole, isArray: true, required: false })
 	roles?: UserRole[];
+
+	@ApiProperty({
+		required: false,
+		description: 'Whether a Firebase Auth account exists for the profile.',
+	})
+	authAccountExists?: boolean;
 }

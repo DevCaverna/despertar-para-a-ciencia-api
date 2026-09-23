@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
 	ApiBearerAuth,
+	ApiCreatedResponse,
 	ApiOkResponse,
 	ApiOperation,
 	ApiTags,
@@ -36,7 +37,7 @@ export class UserController {
 
 	@Post('profile')
 	@ApiOperation({ summary: 'Create or reconcile the authenticated profile' })
-	@ApiOkResponse({ type: UserModel })
+	@ApiCreatedResponse({ type: UserModel })
 	createProfile(
 		@Actor() actor: AuthUser,
 		@Body() body: CreateProfileDto,
@@ -77,7 +78,9 @@ export class UserController {
 	listUsers(
 		@Actor() actor: AuthUser,
 		@Query() query: ListUsersQueryDto,
-	): Promise<Array<User & { roles: UserRole[] }>> {
+	): Promise<
+		Array<User & { roles: UserRole[]; authAccountExists: boolean }>
+	> {
 		return this.users.listUsers(actor, query.page, query.perPage);
 	}
 
