@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import {
@@ -19,41 +19,6 @@ import { MailService } from '../mail/application/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateProfileDto } from './dto/create-profile.dto.js';
 import type { User } from './models/user.model.js';
-
-const verifyEmailCodeScript = `
-local raw = redis.call('GET', KEYS[1])
-if not raw then return 0 end
-local verification = cjson.decode(raw)
-if verification.expiresAt <= tonumber(ARGV[2]) or verification.attempts >= 5 then
-  redis.call('DEL', KEYS[1])
-  return 0
-end
-if verification.codeHash == ARGV[1] then
-  redis.call('DEL', KEYS[1])
-  return 1
-end
-verification.attempts = verification.attempts + 1
-if verification.attempts >= 5 then
-  redis.call('DEL', KEYS[1])
-  return 0
-end
-local ttl = redis.call('TTL', KEYS[1])
-if ttl < 1 then return 0 end
-redis.call('SETEX', KEYS[1], ttl, cjson.encode(verification))
-return 0
-`;
-const releaseAdminMutationLockScript = `
-if redis.call('GET', KEYS[1]) == ARGV[1] then
-  return redis.call('DEL', KEYS[1])
-end
-return 0
-`;
-const renewAdminMutationLockScript = `
-if redis.call('GET', KEYS[1]) == ARGV[1] then
-  return redis.call('PEXPIRE', KEYS[1], ARGV[2])
-end
-return 0
-`;
 
 @Injectable()
 export class UserService {
@@ -128,15 +93,21 @@ export class UserService {
 
 		const code = randomInt(100_000, 1_000_000).toString();
 		const expiresAt = Date.now() + 10 * 60_000;
-		await this.redis.setex(
-			this.emailVerificationKey(email),
-			10 * 60,
-			JSON.stringify({
-				codeHash: this.hashVerificationCode(code),
-				attempts: 0,
-				expiresAt,
-			}),
-		);
+		await Promise.all([
+			this.redis.setex(
+				this.emailVerificationKey(email),
+				10 * 60,
+				JSON.stringify({
+					codeHash: this.hashVerificationCode(code),
+					expiresAt,
+				}),
+			),
+			this.redis.setex(
+				this.emailVerificationAttemptsKey(email),
+				10 * 60,
+				'0',
+			),
+		]);
 
 		await this.mail.sendTextEmail({
 			to: [{ email }],
@@ -194,34 +165,32 @@ export class UserService {
 		roles: UserRole[],
 	): Promise<User> {
 		await this.requireActiveProfile(actor);
-		return this.withAdminMutationLock(async () => {
-			const user = await this.requireUser(userId);
-			const firebaseUser = await this.auth.getUserByEmail(user.email);
-			if (!firebaseUser) {
-				throw new ConflictException(
-					this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
-				);
-			}
+		const user = await this.requireUser(userId);
+		const firebaseUser = await this.auth.getUserByEmail(user.email);
+		if (!firebaseUser) {
+			throw new ConflictException(
+				this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
+			);
+		}
 
-			const normalizedRoles = [...new Set(roles)];
-			if (
-				firebaseUser.roles.includes(UserRole.ADMIN) &&
-				!normalizedRoles.includes(UserRole.ADMIN) &&
-				(await this.countActiveAdministrators()) <= 1
-			) {
-				throw new BadRequestException(
-					this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
-				);
-			}
+		const normalizedRoles = [...new Set(roles)];
+		if (
+			firebaseUser.roles.includes(UserRole.ADMIN) &&
+			!normalizedRoles.includes(UserRole.ADMIN) &&
+			(await this.countActiveAdministrators()) <= 1
+		) {
+			throw new BadRequestException(
+				this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
+			);
+		}
 
-			await this.auth.setUserClaims({
-				firebaseUid: firebaseUser.firebaseUid,
-				id: user.id,
-				roles: normalizedRoles,
-			});
-			await this.auth.revokeSessions(firebaseUser.firebaseUid);
-			return user;
+		await this.auth.setUserClaims({
+			firebaseUid: firebaseUser.firebaseUid,
+			id: user.id,
+			roles: normalizedRoles,
 		});
+		await this.auth.revokeSessions(firebaseUser.firebaseUid);
+		return user;
 	}
 
 	async updateStatus(
@@ -230,48 +199,46 @@ export class UserService {
 		active: boolean,
 	): Promise<User> {
 		await this.requireActiveProfile(actor);
-		return this.withAdminMutationLock(async () => {
-			const user = await this.requireUser(userId);
-			const firebaseUser = await this.auth.getUserByEmail(user.email);
-			if (!firebaseUser) {
-				throw new ConflictException(
-					this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
-				);
-			}
+		const user = await this.requireUser(userId);
+		const firebaseUser = await this.auth.getUserByEmail(user.email);
+		if (!firebaseUser) {
+			throw new ConflictException(
+				this.i18n.t('errors.FIREBASE_ACCOUNT_NOT_FOUND'),
+			);
+		}
 
-			if (
-				!active &&
-				firebaseUser.roles.includes(UserRole.ADMIN) &&
-				(await this.countActiveAdministrators()) <= 1
-			) {
-				throw new BadRequestException(
-					this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
-				);
-			}
+		if (
+			!active &&
+			firebaseUser.roles.includes(UserRole.ADMIN) &&
+			(await this.countActiveAdministrators()) <= 1
+		) {
+			throw new BadRequestException(
+				this.i18n.t('errors.LAST_ACTIVE_ADMINISTRATOR'),
+			);
+		}
 
-			await this.auth.setUserDisabled(firebaseUser.firebaseUid, !active);
-			let updated: User | null;
-			try {
-				updated = await this.prisma.database.orm.public.User.where({
-					id: user.id,
-				}).update({ active, updatedAt: new Date().toISOString() });
-			} catch (error) {
-				await this.auth.setUserDisabled(
-					firebaseUser.firebaseUid,
-					!user.active,
-				);
-				throw error;
-			}
-			if (!updated) {
-				await this.auth.setUserDisabled(
-					firebaseUser.firebaseUid,
-					!user.active,
-				);
-				throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
-			}
-			await this.auth.revokeSessions(firebaseUser.firebaseUid);
-			return updated;
-		});
+		await this.auth.setUserDisabled(firebaseUser.firebaseUid, !active);
+		let updated: User | null;
+		try {
+			updated = await this.prisma.database.orm.public.User.where({
+				id: user.id,
+			}).update({ active, updatedAt: new Date().toISOString() });
+		} catch (error) {
+			await this.auth.setUserDisabled(
+				firebaseUser.firebaseUid,
+				!user.active,
+			);
+			throw error;
+		}
+		if (!updated) {
+			await this.auth.setUserDisabled(
+				firebaseUser.firebaseUid,
+				!user.active,
+			);
+			throw new NotFoundException(this.i18n.t('errors.NOT_FOUND'));
+		}
+		await this.auth.revokeSessions(firebaseUser.firebaseUid);
+		return updated;
 	}
 
 	private async requireActiveProfile(actor: AuthUser): Promise<User> {
@@ -289,65 +256,76 @@ export class UserService {
 	}
 
 	private async verifyEmailCode(email: string, code: string): Promise<void> {
-		const verified = Number(
-			await this.redis.eval(
-				verifyEmailCodeScript,
-				1,
-				this.emailVerificationKey(email),
-				this.hashVerificationCode(code),
-				Date.now().toString(),
-			),
-		);
-		if (verified !== 1) {
+		const key = this.emailVerificationKey(email);
+		const rawVerification = await this.redis.get(key);
+		let verification: { codeHash: string; expiresAt: number } | undefined;
+		try {
+			const parsed: unknown = rawVerification
+				? JSON.parse(rawVerification)
+				: undefined;
+			if (
+				typeof parsed === 'object' &&
+				parsed !== null &&
+				typeof (parsed as { codeHash?: unknown }).codeHash ===
+					'string' &&
+				typeof (parsed as { expiresAt?: unknown }).expiresAt ===
+					'number'
+			) {
+				verification = parsed as {
+					codeHash: string;
+					expiresAt: number;
+				};
+			}
+		} catch {
+			verification = undefined;
+		}
+
+		const attemptsKey = this.emailVerificationAttemptsKey(email);
+		const attempts = Number((await this.redis.get(attemptsKey)) ?? 0);
+		if (
+			!verification ||
+			attempts >= 5 ||
+			verification.expiresAt <= Date.now()
+		) {
 			throw new BadRequestException(
 				this.i18n.t('errors.EMAIL_VERIFICATION_CODE_INVALID'),
 			);
 		}
+
+		const expectedHash = Buffer.from(verification.codeHash, 'hex');
+		const suppliedHash = Buffer.from(
+			this.hashVerificationCode(code),
+			'hex',
+		);
+		if (
+			expectedHash.length !== suppliedHash.length ||
+			!timingSafeEqual(expectedHash, suppliedHash)
+		) {
+			const nextAttempts = await this.redis.incr(attemptsKey);
+			if (nextAttempts === 1) {
+				await this.redis.expire(
+					attemptsKey,
+					Math.max(
+						1,
+						Math.ceil((verification.expiresAt - Date.now()) / 1000),
+					),
+				);
+			}
+			if (nextAttempts >= 5) await this.redis.del(key, attemptsKey);
+			throw new BadRequestException(
+				this.i18n.t('errors.EMAIL_VERIFICATION_CODE_INVALID'),
+			);
+		}
+
+		await this.redis.del(key, attemptsKey);
 	}
 
 	private emailVerificationKey(email: string): string {
 		return `email-verification-code:${email}`;
 	}
 
-	private async withAdminMutationLock<T>(
-		operation: () => Promise<T>,
-	): Promise<T> {
-		const token = randomUUID();
-		const acquired = await this.redis.set(
-			'users:admin-mutation-lock',
-			token,
-			'PX',
-			30_000,
-			'NX',
-		);
-		if (acquired !== 'OK') {
-			throw new ConflictException(
-				this.i18n.t('errors.ADMIN_OPERATION_IN_PROGRESS'),
-			);
-		}
-
-		const refreshTimer = setInterval(() => {
-			void this.redis.eval(
-				renewAdminMutationLockScript,
-				1,
-				'users:admin-mutation-lock',
-				token,
-				'30000',
-			);
-		}, 10_000);
-		refreshTimer.unref();
-
-		try {
-			return await operation();
-		} finally {
-			clearInterval(refreshTimer);
-			await this.redis.eval(
-				releaseAdminMutationLockScript,
-				1,
-				'users:admin-mutation-lock',
-				token,
-			);
-		}
+	private emailVerificationAttemptsKey(email: string): string {
+		return `${this.emailVerificationKey(email)}:attempts`;
 	}
 
 	private hashVerificationCode(code: string): string {

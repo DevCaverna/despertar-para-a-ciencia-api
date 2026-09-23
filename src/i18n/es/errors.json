@@ -7,7 +7,6 @@
 	"PROFILE_CREATION_FAILED": "No se pudo crear el perfil",
 	"FIREBASE_ACCOUNT_NOT_FOUND": "No se encontró la cuenta de Firebase",
 	"LAST_ACTIVE_ADMINISTRATOR": "No se puede cambiar el último administrador activo",
-	"ADMIN_OPERATION_IN_PROGRESS": "Otra operación administrativa está en curso",
 	"PROFILE_INACTIVE": "El perfil de usuario está inactivo",
 	"VERIFIED_EMAIL_REQUIRED": "Se requiere una dirección de correo electrónico verificada",
 	"NAME_REQUIRED": "El nombre es obligatorio",

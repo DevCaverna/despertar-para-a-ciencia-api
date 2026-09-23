@@ -6,10 +6,11 @@ import { EmailVerificationRateLimitMiddleware } from './email-verification-rate-
 describe('EmailVerificationRateLimitMiddleware', () => {
 	it('rejects the fourth verification code request from one IP', async () => {
 		const redis = {
-			eval: vi.fn(),
+			incr: vi.fn(),
+			expire: vi.fn().mockResolvedValue(1),
 			ttl: vi.fn().mockResolvedValue(42),
 		};
-		redis.eval
+		redis.incr
 			.mockResolvedValueOnce(1)
 			.mockResolvedValueOnce(2)
 			.mockResolvedValueOnce(3)

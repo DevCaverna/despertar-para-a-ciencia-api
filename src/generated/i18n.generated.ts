@@ -18,7 +18,6 @@ export type I18nTranslations = {
         "PROFILE_CREATION_FAILED": string;
         "FIREBASE_ACCOUNT_NOT_FOUND": string;
         "LAST_ACTIVE_ADMINISTRATOR": string;
-        "ADMIN_OPERATION_IN_PROGRESS": string;
         "PROFILE_INACTIVE": string;
         "VERIFIED_EMAIL_REQUIRED": string;
         "NAME_REQUIRED": string;

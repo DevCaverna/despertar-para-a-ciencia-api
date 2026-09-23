@@ -5,11 +5,6 @@ import { Redis } from 'ioredis';
 
 const LIMIT = 3;
 const WINDOW_SECONDS = 60;
-const incrementRateLimitScript = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
-return count
-`;
 
 @Injectable()
 export class EmailVerificationRateLimitMiddleware implements NestMiddleware {
@@ -23,14 +18,8 @@ export class EmailVerificationRateLimitMiddleware implements NestMiddleware {
 		const clientIp =
 			request.ip ?? request.socket.remoteAddress ?? 'unknown';
 		const key = `rate-limit:email-verification:${clientIp}`;
-		const count = Number(
-			await this.redis.eval(
-				incrementRateLimitScript,
-				1,
-				key,
-				WINDOW_SECONDS.toString(),
-			),
-		);
+		const count = await this.redis.incr(key);
+		if (count === 1) await this.redis.expire(key, WINDOW_SECONDS);
 
 		if (count > LIMIT) {
 			const ttl = await this.redis.ttl(key);

@@ -29,8 +29,6 @@ describe('UserService', () => {
 		const prismaMock = createMockPrisma();
 		users = prismaMock.users;
 		redis = createMockRedis();
-		redis.set.mockResolvedValue('OK');
-		redis.eval.mockResolvedValue(0);
 		auth = {
 			setUserClaims: vi.fn(),
 			getUserByEmail: vi.fn(),
@@ -50,15 +48,15 @@ describe('UserService', () => {
 
 	it('creates a verified profile and binds its PostgreSQL ID to Firebase', async () => {
 		users.findByEmail.mockResolvedValue(null);
-		redis.get.mockResolvedValue(
-			JSON.stringify({
-				codeHash:
-					'8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
-				attempts: 0,
-				expiresAt: Date.now() + 600_000,
-			}),
-		);
-		redis.eval.mockResolvedValue(1);
+		redis.get
+			.mockResolvedValueOnce(
+				JSON.stringify({
+					codeHash:
+						'8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+					expiresAt: Date.now() + 600_000,
+				}),
+			)
+			.mockResolvedValueOnce('0');
 		users.create.mockResolvedValue(profile);
 
 		await expect(
@@ -84,12 +82,9 @@ describe('UserService', () => {
 			id: profile.id,
 			roles: [UserRole.USER],
 		});
-		expect(redis.eval).toHaveBeenCalledWith(
-			expect.any(String),
-			1,
+		expect(redis.del).toHaveBeenCalledWith(
 			'email-verification-code:ada@example.com',
-			expect.any(String),
-			expect.any(String),
+			'email-verification-code:ada@example.com:attempts',
 		);
 	});
 
@@ -121,14 +116,16 @@ describe('UserService', () => {
 
 	it('rejects an invalid verification code', async () => {
 		users.findByEmail.mockResolvedValue(null);
-		redis.get.mockResolvedValue(
-			JSON.stringify({
-				codeHash:
-					'8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
-				attempts: 0,
-				expiresAt: Date.now() + 600_000,
-			}),
-		);
+		redis.get
+			.mockResolvedValueOnce(
+				JSON.stringify({
+					codeHash:
+						'8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+					expiresAt: Date.now() + 600_000,
+				}),
+			)
+			.mockResolvedValueOnce('0');
+		redis.incr.mockResolvedValue(1);
 
 		await expect(
 			service.createProfile(
@@ -141,6 +138,10 @@ describe('UserService', () => {
 			),
 		).rejects.toThrow(BadRequestException);
 		expect(users.create).not.toHaveBeenCalled();
+		expect(redis.expire).toHaveBeenCalledWith(
+			'email-verification-code:user@example.com:attempts',
+			expect.any(Number),
+		);
 	});
 
 	it('sends a six-digit verification code for an email without a profile', async () => {
@@ -153,6 +154,11 @@ describe('UserService', () => {
 			'email-verification-code:ada@example.com',
 			600,
 			expect.stringContaining('codeHash'),
+		);
+		expect(redis.setex).toHaveBeenCalledWith(
+			'email-verification-code:ada@example.com:attempts',
+			600,
+			'0',
 		);
 		expect(mail.sendTextEmail).toHaveBeenCalledWith(
 			expect.objectContaining({ to: [{ email: 'ada@example.com' }] }),
