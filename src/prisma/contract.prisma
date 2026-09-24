@@ -1,1 +1,10 @@
 // use prisma-next
+
+model User {
+  id          Uuid     @id @default(dbgenerated("uuidv7()"))
+  name        String
+  email       String   @unique
+  active      Boolean  @default(true)
+  createdAt   TimestamptzString @default(now())
+  updatedAt   TimestamptzString @default(now())
+}

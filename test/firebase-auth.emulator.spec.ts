@@ -36,7 +36,7 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		uid = user.uid;
 		await getAuth().setCustomUserClaims(uid, {
 			id: 'application-user-id',
-			roles: [UserRole.ADMINISTRATOR],
+			roles: [UserRole.ADMIN],
 		});
 	});
 
@@ -74,10 +74,10 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 		const user = await adapter.validateToken(await signIn());
 
 		expect(user).toMatchObject({
+			subject: uid,
 			id: 'application-user-id',
 			email,
-			roles: [UserRole.ADMINISTRATOR],
-			provider: 'firebase',
+			roles: [UserRole.ADMIN],
 		});
 	});
 
@@ -91,6 +91,25 @@ emulatorSuite('FirebaseAuthAdapter with the Auth Emulator', () => {
 
 		await expect(adapter.validateToken(token)).rejects.toThrow(/./);
 		await getAuth().updateUser(uid, { disabled: false });
+	});
+
+	it('exposes changed custom claims only in a newly issued ID token', async () => {
+		const issuedToken = await signIn();
+		await getAuth().setCustomUserClaims(uid, {
+			id: 'application-user-id',
+			roles: [UserRole.USER],
+		});
+
+		await expect(adapter.validateToken(issuedToken)).resolves.toMatchObject(
+			{
+				roles: [UserRole.ADMIN],
+			},
+		);
+		await expect(
+			adapter.validateToken(await signIn()),
+		).resolves.toMatchObject({
+			roles: [UserRole.USER],
+		});
 	});
 
 	it('rejects tokens revoked after issuance', async () => {

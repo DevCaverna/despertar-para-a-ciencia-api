@@ -1,10 +1,34 @@
+import { resolve as resolvePath } from 'node:path';
 import { stdin as input, stdout as output } from 'node:process';
 import { emitKeypressEvents, type Key } from 'node:readline';
 import * as readline from 'node:readline/promises';
+import { pathToFileURL } from 'node:url';
 
 import * as dotenv from 'dotenv';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type UserRecord } from 'firebase-admin/auth';
+
+import { UserRole } from '../src/auth/domain/user-role.js';
+import { createPrismaDatabase, createPrismaPool } from '../src/prisma/db.js';
+
+export function assertExistingAccountsActive({
+	firebaseDisabled,
+	profileActive,
+}: {
+	firebaseDisabled: boolean;
+	profileActive: boolean;
+}): void {
+	if (firebaseDisabled) {
+		throw new Error(
+			'Conta Firebase desativada. Reative-a pelo procedimento administrativo antes de criar o administrador.',
+		);
+	}
+	if (!profileActive) {
+		throw new Error(
+			'Perfil PostgreSQL inativo. Ative-o pelo procedimento administrativo antes de criar o administrador.',
+		);
+	}
+}
 
 dotenv.config();
 
@@ -84,85 +108,116 @@ function setupFirebase(): void {
 }
 
 async function main(): Promise<void> {
-	console.log('--- Criador de Administrador (Apenas Firebase) ---');
+	console.log('--- Criador de Administrador ---');
+	let pool: ReturnType<typeof createPrismaPool> | undefined;
+	let database: ReturnType<typeof createPrismaDatabase> | undefined;
 
 	try {
 		setupFirebase();
 
-		const name = await rl.question('Nome completo: ');
-		const email = await rl.question('E-mail: ');
-		const password = await questionWithoutEcho(
-			'Senha (min 12 caracteres): ',
-		);
-		rl = readline.createInterface({ input, output });
-		if (password.length < 12) {
-			throw new Error('Password must contain at least 12 characters');
+		const name = (await rl.question('Nome completo: ')).trim();
+		const email = (await rl.question('E-mail: ')).trim().toLowerCase();
+		if (!name || !email) {
+			throw new Error('Name and email are required');
 		}
-		const phoneInput = (
-			await rl.question(
-				'Telefone em formato internacional, opcional (ex: +15555550100): ',
-			)
-		).trim();
-		if (phoneInput && !/^\+[1-9]\d{6,14}$/.test(phoneInput)) {
-			throw new Error(
-				'Phone number must use the international E.164 format, e.g. +15555550100',
-			);
+		if (!process.env.DATABASE_URL) {
+			throw new Error('DATABASE_URL is required');
 		}
-		const phoneNumber = phoneInput || undefined;
 
 		console.log('\nProcessando...');
+		pool = createPrismaPool(process.env.DATABASE_URL);
+		database = createPrismaDatabase(pool);
+		let profile = await database.orm.public.User.where({ email }).first();
+		if (profile) {
+			assertExistingAccountsActive({
+				firebaseDisabled: false,
+				profileActive: profile.active,
+			});
+		}
 
-		// 1. Verificar/Criar no Firebase
 		let userRecord: UserRecord;
 		try {
 			userRecord = await getAuth().getUserByEmail(email);
-			console.log(
-				`Usuário Firebase já existe (UID: ${userRecord.uid}). Atualizando roles...`,
-			);
-
-			// Se o usuário já existe, atualizamos os dados básicos
-			await getAuth().updateUser(userRecord.uid, {
-				displayName: name,
-				password: password || undefined,
-				phoneNumber,
-			});
+			console.log('Usuário Firebase já existe.');
 		} catch (e: unknown) {
 			const authError = e as { code?: string };
 			if (authError?.code === 'auth/user-not-found') {
+				const password = await questionWithoutEcho(
+					'Senha inicial (min 12 caracteres): ',
+				);
+				rl = readline.createInterface({ input, output });
+				if (password.length < 12) {
+					throw new Error(
+						'Password must contain at least 12 characters',
+						{
+							cause: e,
+						},
+					);
+				}
 				userRecord = await getAuth().createUser({
 					email,
 					password,
 					displayName: name,
-					phoneNumber,
+					emailVerified: true,
 				});
-				console.log(
-					`Usuário criado no Firebase (UID: ${userRecord.uid})`,
-				);
+				console.log('Usuário criado no Firebase.');
 			} else {
 				throw e;
 			}
 		}
+		if (userRecord) {
+			assertExistingAccountsActive({
+				firebaseDisabled: userRecord.disabled,
+				profileActive: true,
+			});
+		}
+		if (!userRecord.emailVerified) {
+			throw new Error(
+				'The Firebase administrator email must be verified',
+			);
+		}
 
-		// 2. Setar Custom Claims (Role Administrador)
+		if (!profile) {
+			profile = await database.orm.public.User.create({ name, email });
+		}
+
 		await getAuth().setCustomUserClaims(userRecord.uid, {
-			roles: ['ADMINISTRATOR'],
+			...userRecord.customClaims,
+			id: profile.id,
+			roles: [
+				...new Set([
+					...(Array.isArray(userRecord.customClaims?.roles)
+						? userRecord.customClaims.roles.filter(
+								(role): role is UserRole =>
+									typeof role === 'string' &&
+									Object.values(UserRole).includes(
+										role as UserRole,
+									),
+							)
+						: []),
+					UserRole.ADMIN,
+				]),
+			],
 		});
 
-		console.log(
-			'✅ Roles de ADMINISTRATOR configuradas no Firebase com sucesso.',
-		);
-		console.log(`ID (UID): ${userRecord.uid}`);
-		console.log('\nNota: Este administrador existe apenas no Firebase.');
+		console.log('Administrador reconciliado no Firebase e PostgreSQL.');
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error('\n❌ Erro:', message);
 		process.exitCode = 1;
 	} finally {
 		rl.close();
+		if (database) await database.close();
+		if (pool) await pool.end();
 	}
 }
 
-main().catch((err: unknown) => {
-	console.error('Failed to run main:', err);
-	process.exitCode = 1;
-});
+if (
+	process.argv[1] &&
+	import.meta.url === pathToFileURL(resolvePath(process.argv[1])).href
+) {
+	main().catch((err: unknown) => {
+		console.error('Failed to run main:', err);
+		process.exitCode = 1;
+	});
+}

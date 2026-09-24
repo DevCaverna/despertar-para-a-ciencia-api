@@ -15,6 +15,7 @@ declare namespace NodeJS {
 		FIREBASE_PROJECT_ID?: string;
 		FIREBASE_PRIVATE_KEY?: string;
 		FIREBASE_CLIENT_EMAIL?: string;
+		EMAIL_VERIFICATION_HMAC_SECRET?: string;
 		FIREBASE_WEB_API_KEY?: string;
 
 		// Brevo

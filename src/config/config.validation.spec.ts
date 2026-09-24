@@ -12,9 +12,12 @@ function validEnvironment(): Record<string, unknown> {
 		CORS_ORIGINS: 'http://localhost:3000,https://app.example.com/',
 		SWAGGER_ENABLED: 'false',
 		DATABASE_URL: 'postgresql://api_user:password@localhost:5432/app',
+		REDIS_URL: 'redis://localhost:6379',
 		FIREBASE_PROJECT_ID: 'test-project',
 		FIREBASE_PRIVATE_KEY: 'private-key',
 		FIREBASE_CLIENT_EMAIL: 'test@example.com',
+		EMAIL_VERIFICATION_HMAC_SECRET:
+			'a-secure-test-secret-with-at-least-32-chars',
 		STORAGE_DRIVER: 'memory',
 	};
 }
@@ -81,6 +84,13 @@ describe('validateEnvironment', () => {
 		expect(environmentSchema.safeParse(config).success).toBe(false);
 	});
 
+	it('requires a sufficiently long email verification HMAC secret', () => {
+		const config = validEnvironment();
+		config.EMAIL_VERIFICATION_HMAC_SECRET = 'too-short';
+
+		expect(environmentSchema.safeParse(config).success).toBe(false);
+	});
+
 	it('requires conditional Brevo credentials', () => {
 		const config = validEnvironment();
 		config.MAIL_DRIVER = 'brevo';
@@ -88,6 +98,24 @@ describe('validateEnvironment', () => {
 		config.BREVO_SENDER_EMAIL = '';
 
 		expect(environmentSchema.safeParse(config).success).toBe(false);
+	});
+
+	it('allows local email capture only in development with delivery enabled', () => {
+		const config = {
+			...validEnvironment(),
+			NODE_ENV: 'development',
+			MAIL_DRIVER: 'local-capture',
+			SEND_EMAILS: 'true',
+		};
+		expect(environmentSchema.safeParse(config).success).toBe(true);
+		expect(
+			environmentSchema.safeParse({ ...config, NODE_ENV: 'production' })
+				.success,
+		).toBe(false);
+		expect(
+			environmentSchema.safeParse({ ...config, SEND_EMAILS: 'false' })
+				.success,
+		).toBe(false);
 	});
 
 	it('requires conditional R2 credentials', () => {

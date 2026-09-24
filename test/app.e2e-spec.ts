@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -86,7 +87,26 @@ describe('AppController (e2e)', () => {
 		expect(response.status).toBe(404);
 	});
 
-	it('/health/ready (GET) confirms PostgreSQL connectivity', async () => {
+	it('documents the profile status and public code route accurately', () => {
+		const document = SwaggerModule.createDocument(
+			app,
+			new DocumentBuilder()
+				.addBearerAuth(
+					{ type: 'http', scheme: 'bearer' },
+					'firebase-auth',
+				)
+				.build(),
+		);
+		const profilePost = document.paths['/users/profile']?.post;
+		const codePost =
+			document.paths['/users/send-email-verification-code']?.post;
+
+		expect(profilePost?.responses).toHaveProperty('201');
+		expect(profilePost?.security).toEqual([{ 'firebase-auth': [] }]);
+		expect(codePost?.security).toBeUndefined();
+	});
+
+	it('/health/ready (GET) confirms PostgreSQL and Redis connectivity', async () => {
 		const response = await request(app.getHttpServer()).get(
 			'/health/ready',
 		);

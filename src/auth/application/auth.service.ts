@@ -12,51 +12,35 @@ export class AuthService {
 		return this.auth.validateToken(token);
 	}
 
-	async assignUserRoles({
-		roles,
-		email,
-	}: {
-		roles: UserRole[];
-		email: string;
-	}): Promise<void> {
-		return this.auth.assignUserRoles({ roles, email });
+	getUserBySubject(subject: string): Promise<AuthUser | undefined> {
+		return this.auth.getUserBySubject(subject);
 	}
 
-	async revokeUserRoles({
-		roles,
-		email,
-	}: {
-		roles: UserRole[];
-		email: string;
-	}): Promise<void> {
-		return this.auth.revokeUserRoles({ roles, email });
-	}
-
-	async markEmailAsVerified({
-		email,
-		id,
-	}: {
-		id: string;
-		email: string;
-	}): Promise<void> {
-		return this.auth.markEmailAsVerified({ email, id });
-	}
-
-	async updatePassword({
-		email,
-		password,
-	}: {
-		email: string;
-		password: string;
-	}): Promise<void> {
-		return this.auth.updatePassword({ email, password });
-	}
-
-	async getUserByEmail(email: string): Promise<AuthUser | undefined> {
+	getUserByEmail(email: string): Promise<AuthUser | undefined> {
 		return this.auth.getUserByEmail(email);
 	}
 
-	async deleteUserByEmail(email: string): Promise<void> {
-		return this.auth.deleteUserByEmail(email);
+	markEmailVerified(subject: string): Promise<void> {
+		return this.auth.markEmailVerified(subject);
+	}
+
+	setUserClaims(input: {
+		subject: string;
+		id?: string;
+		roles: UserRole[];
+	}): Promise<void> {
+		return this.auth.setUserClaims(input);
+	}
+
+	enableUser(subject: string): Promise<void> {
+		return this.auth.enableUser(subject);
+	}
+
+	disableUser(subject: string): Promise<void> {
+		return this.auth.disableUser(subject);
+	}
+
+	revokeSessions(subject: string): Promise<void> {
+		return this.auth.revokeSessions(subject);
 	}
 }

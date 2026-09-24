@@ -1,0 +1,4 @@
+{
+	"EMAIL_VERIFICATION_SUBJECT": "Confirme seu e-mail",
+	"EMAIL_VERIFICATION_BODY": "Seu código de verificação é {code}. Ele expira em 10 minutos."
+}
