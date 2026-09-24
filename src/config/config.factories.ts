@@ -51,6 +51,9 @@ export const mailConfig = registerAs('mail', () => {
 			} satisfies BrevoConfig,
 		};
 	}
+	if (env.MAIL_DRIVER === 'local-capture') {
+		return { driver: 'local-capture', sendEmails: true };
+	}
 
 	return { driver: 'noop' as const, sendEmails: false as const };
 });

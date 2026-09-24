@@ -27,6 +27,11 @@ export type MailConfig =
 			brevo?: undefined;
 	  }
 	| {
+			driver: 'local-capture';
+			sendEmails: true;
+			brevo?: undefined;
+	  }
+	| {
 			driver: 'brevo';
 			sendEmails: boolean;
 			brevo: BrevoConfig;

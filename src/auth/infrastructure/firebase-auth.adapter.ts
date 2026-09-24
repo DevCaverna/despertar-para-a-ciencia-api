@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+	Injectable,
+	ServiceUnavailableException,
+	UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
 	cert,
@@ -9,6 +13,7 @@ import {
 import {
 	FirebaseAuthError,
 	getAuth,
+	type DecodedIdToken,
 	type UserRecord,
 } from 'firebase-admin/auth';
 
@@ -45,7 +50,27 @@ export class FirebaseAuthAdapter implements AuthPort {
 			dependency: 'firebase',
 			operation: 'validate_token',
 			work: async () => {
-				const decoded = await getAuth().verifyIdToken(token, true);
+				let decoded: DecodedIdToken;
+				try {
+					decoded = await getAuth().verifyIdToken(token, true);
+				} catch (error) {
+					if (
+						error instanceof FirebaseAuthError &&
+						[
+							'auth/argument-error',
+							'auth/id-token-expired',
+							'auth/id-token-revoked',
+							'auth/invalid-id-token',
+							'auth/user-not-found',
+							'auth/user-disabled',
+						].includes(error.code)
+					) {
+						throw new UnauthorizedException('Invalid bearer token');
+					}
+					throw new ServiceUnavailableException(
+						'Authentication service is unavailable',
+					);
+				}
 
 				return this.toAuthUser({
 					subject: decoded.uid,

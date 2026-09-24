@@ -1,6 +1,8 @@
+import { resolve as resolvePath } from 'node:path';
 import { stdin as input, stdout as output } from 'node:process';
 import { emitKeypressEvents, type Key } from 'node:readline';
 import * as readline from 'node:readline/promises';
+import { pathToFileURL } from 'node:url';
 
 import * as dotenv from 'dotenv';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
@@ -8,6 +10,25 @@ import { getAuth, type UserRecord } from 'firebase-admin/auth';
 
 import { UserRole } from '../src/auth/domain/user-role.js';
 import { createPrismaDatabase, createPrismaPool } from '../src/prisma/db.js';
+
+export function assertExistingAccountsActive({
+	firebaseDisabled,
+	profileActive,
+}: {
+	firebaseDisabled: boolean;
+	profileActive: boolean;
+}): void {
+	if (firebaseDisabled) {
+		throw new Error(
+			'Conta Firebase desativada. Reative-a pelo procedimento administrativo antes de criar o administrador.',
+		);
+	}
+	if (!profileActive) {
+		throw new Error(
+			'Perfil PostgreSQL inativo. Ative-o pelo procedimento administrativo antes de criar o administrador.',
+		);
+	}
+}
 
 dotenv.config();
 
@@ -104,6 +125,15 @@ async function main(): Promise<void> {
 		}
 
 		console.log('\nProcessando...');
+		pool = createPrismaPool(process.env.DATABASE_URL);
+		database = createPrismaDatabase(pool);
+		let profile = await database.orm.public.User.where({ email }).first();
+		if (profile) {
+			assertExistingAccountsActive({
+				firebaseDisabled: false,
+				profileActive: profile.active,
+			});
+		}
 
 		let userRecord: UserRecord;
 		try {
@@ -135,15 +165,18 @@ async function main(): Promise<void> {
 				throw e;
 			}
 		}
+		if (userRecord) {
+			assertExistingAccountsActive({
+				firebaseDisabled: userRecord.disabled,
+				profileActive: true,
+			});
+		}
 		if (!userRecord.emailVerified) {
 			throw new Error(
 				'The Firebase administrator email must be verified',
 			);
 		}
 
-		pool = createPrismaPool(process.env.DATABASE_URL);
-		database = createPrismaDatabase(pool);
-		let profile = await database.orm.public.User.where({ email }).first();
 		if (!profile) {
 			profile = await database.orm.public.User.create({ name, email });
 		}
@@ -179,7 +212,12 @@ async function main(): Promise<void> {
 	}
 }
 
-main().catch((err: unknown) => {
-	console.error('Failed to run main:', err);
-	process.exitCode = 1;
-});
+if (
+	process.argv[1] &&
+	import.meta.url === pathToFileURL(resolvePath(process.argv[1])).href
+) {
+	main().catch((err: unknown) => {
+		console.error('Failed to run main:', err);
+		process.exitCode = 1;
+	});
+}

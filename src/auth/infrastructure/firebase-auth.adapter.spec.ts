@@ -19,6 +19,11 @@ const config = {
 		clientEmail: 'service@example.com',
 	})),
 };
+class MockFirebaseAuthError extends Error {
+	constructor(public code: string) {
+		super(code);
+	}
+}
 
 vi.mock('firebase-admin/app', () => ({
 	cert: vi.fn(),
@@ -26,7 +31,7 @@ vi.mock('firebase-admin/app', () => ({
 	initializeApp: vi.fn(),
 }));
 vi.mock('firebase-admin/auth', () => ({
-	FirebaseAuthError: class FirebaseAuthError extends Error {},
+	FirebaseAuthError: MockFirebaseAuthError,
 	getAuth,
 }));
 
@@ -35,18 +40,38 @@ const { FirebaseAuthAdapter } = await import('./firebase-auth.adapter.js');
 describe('FirebaseAuthAdapter', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('delegates token validation to Firebase', async () => {
+	it('maps revoked tokens to an authentication failure', async () => {
 		const adapter = new FirebaseAuthAdapter(config as never);
 		rootAuth.verifyIdToken.mockRejectedValue(
-			new Error('auth/id-token-revoked'),
+			new MockFirebaseAuthError('auth/id-token-revoked'),
 		);
 
 		await expect(adapter.validateToken('revoked-token')).rejects.toThrow(
-			'auth/id-token-revoked',
+			'Invalid bearer token',
 		);
 		expect(rootAuth.verifyIdToken).toHaveBeenCalledWith(
 			'revoked-token',
 			true,
+		);
+	});
+
+	it('maps Firebase infrastructure failures to service unavailable', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.verifyIdToken.mockRejectedValue(
+			new MockFirebaseAuthError('auth/internal-error'),
+		);
+
+		await expect(adapter.validateToken('token')).rejects.toThrow(
+			'Authentication service is unavailable',
+		);
+	});
+
+	it('maps unexpected validation failures to service unavailable', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.verifyIdToken.mockRejectedValue(new Error('network failure'));
+
+		await expect(adapter.validateToken('token')).rejects.toThrow(
+			'Authentication service is unavailable',
 		);
 	});
 

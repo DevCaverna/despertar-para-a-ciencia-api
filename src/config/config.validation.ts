@@ -74,7 +74,7 @@ const baseEnvironmentSchema = z.object({
 		.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
 		.default('info'),
 	SEND_EMAILS: booleanValue,
-	MAIL_DRIVER: z.enum(['brevo', 'noop']),
+	MAIL_DRIVER: z.enum(['brevo', 'noop', 'local-capture']),
 	CORS_ORIGINS: corsOrigins,
 	SWAGGER_ENABLED: booleanValue,
 	API_NAME: z.string().min(1).default('Despertar para a Ciência API'),
@@ -124,6 +124,18 @@ export const environmentSchema = baseEnvironmentSchema.superRefine(
 					});
 				}
 			}
+		}
+
+		if (
+			environment.MAIL_DRIVER === 'local-capture' &&
+			(environment.NODE_ENV !== 'development' || !environment.SEND_EMAILS)
+		) {
+			context.addIssue({
+				code: 'custom',
+				path: ['MAIL_DRIVER'],
+				message:
+					'MAIL_DRIVER=local-capture requires NODE_ENV=development and SEND_EMAILS=true.',
+			});
 		}
 
 		if (environment.STORAGE_DRIVER === 'r2') {

@@ -1,6 +1,7 @@
 import {
 	ExecutionContext,
 	ForbiddenException,
+	ServiceUnavailableException,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -76,5 +77,34 @@ describe('AuthGuard', () => {
 		await expect(
 			guard.canActivate(createMockExecutionContext('Bearer valid-token')),
 		).rejects.toThrow(ForbiddenException);
+	});
+
+	it('preserves service unavailability instead of treating it as invalid credentials', async () => {
+		vi.spyOn(reflector, 'getAllAndOverride')
+			.mockReturnValueOnce(false)
+			.mockReturnValueOnce(undefined);
+		authService.validateToken.mockRejectedValue(
+			new ServiceUnavailableException('private upstream detail'),
+		);
+
+		await expect(
+			guard.canActivate(createMockExecutionContext('Bearer token')),
+		).rejects.toMatchObject({
+			status: 503,
+			message: 'Authentication service is unavailable',
+		});
+	});
+
+	it('ignores invalid bearer tokens on public routes', async () => {
+		vi.spyOn(reflector, 'getAllAndOverride')
+			.mockReturnValueOnce(true)
+			.mockReturnValueOnce(undefined);
+		authService.validateToken.mockRejectedValue(
+			new UnauthorizedException('provider detail'),
+		);
+
+		await expect(
+			guard.canActivate(createMockExecutionContext('Bearer bad-token')),
+		).resolves.toBe(true);
 	});
 });

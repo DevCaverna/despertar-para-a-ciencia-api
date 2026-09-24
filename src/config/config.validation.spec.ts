@@ -100,6 +100,24 @@ describe('validateEnvironment', () => {
 		expect(environmentSchema.safeParse(config).success).toBe(false);
 	});
 
+	it('allows local email capture only in development with delivery enabled', () => {
+		const config = {
+			...validEnvironment(),
+			NODE_ENV: 'development',
+			MAIL_DRIVER: 'local-capture',
+			SEND_EMAILS: 'true',
+		};
+		expect(environmentSchema.safeParse(config).success).toBe(true);
+		expect(
+			environmentSchema.safeParse({ ...config, NODE_ENV: 'production' })
+				.success,
+		).toBe(false);
+		expect(
+			environmentSchema.safeParse({ ...config, SEND_EMAILS: 'false' })
+				.success,
+		).toBe(false);
+	});
+
 	it('requires conditional R2 credentials', () => {
 		const config = validEnvironment();
 		config.STORAGE_DRIVER = 'r2';
