@@ -231,8 +231,8 @@ importers:
         specifier: ^26.6.1
         version: 26.6.2
       '@types/pg':
-        specifier: 8.23.1
-        version: 8.23.1
+        specifier: 8.20.4
+        version: 8.20.4
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1
