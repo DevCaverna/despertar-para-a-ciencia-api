@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRole } from '../domain/user-role.js';
 
 const rootAuth = {
+	getUser: vi.fn(),
 	getUserByEmail: vi.fn(),
 	setCustomUserClaims: vi.fn(),
 	revokeRefreshTokens: vi.fn(),
@@ -18,6 +19,11 @@ const config = {
 		clientEmail: 'service@example.com',
 	})),
 };
+class MockFirebaseAuthError extends Error {
+	constructor(public code: string) {
+		super(code);
+	}
+}
 
 vi.mock('firebase-admin/app', () => ({
 	cert: vi.fn(),
@@ -25,7 +31,7 @@ vi.mock('firebase-admin/app', () => ({
 	initializeApp: vi.fn(),
 }));
 vi.mock('firebase-admin/auth', () => ({
-	FirebaseAuthError: class FirebaseAuthError extends Error {},
+	FirebaseAuthError: MockFirebaseAuthError,
 	getAuth,
 }));
 
@@ -34,14 +40,14 @@ const { FirebaseAuthAdapter } = await import('./firebase-auth.adapter.js');
 describe('FirebaseAuthAdapter', () => {
 	beforeEach(() => vi.clearAllMocks());
 
-	it('delegates token validation to Firebase', async () => {
+	it('maps revoked tokens to an authentication failure', async () => {
 		const adapter = new FirebaseAuthAdapter(config as never);
 		rootAuth.verifyIdToken.mockRejectedValue(
-			new Error('auth/id-token-revoked'),
+			new MockFirebaseAuthError('auth/id-token-revoked'),
 		);
 
 		await expect(adapter.validateToken('revoked-token')).rejects.toThrow(
-			'auth/id-token-revoked',
+			'Invalid bearer token',
 		);
 		expect(rootAuth.verifyIdToken).toHaveBeenCalledWith(
 			'revoked-token',
@@ -49,22 +55,85 @@ describe('FirebaseAuthAdapter', () => {
 		);
 	});
 
-	it('revokes refresh tokens after assigning an administrative role', async () => {
+	it('maps Firebase infrastructure failures to service unavailable', async () => {
 		const adapter = new FirebaseAuthAdapter(config as never);
-		rootAuth.getUserByEmail.mockResolvedValue({
+		rootAuth.verifyIdToken.mockRejectedValue(
+			new MockFirebaseAuthError('auth/internal-error'),
+		);
+
+		await expect(adapter.validateToken('token')).rejects.toThrow(
+			'Authentication service is unavailable',
+		);
+	});
+
+	it('maps unexpected validation failures to service unavailable', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.verifyIdToken.mockRejectedValue(new Error('network failure'));
+
+		await expect(adapter.validateToken('token')).rejects.toThrow(
+			'Authentication service is unavailable',
+		);
+	});
+
+	it('maps the Firebase UID and ignores invalid role claims', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.verifyIdToken.mockResolvedValue({
+			uid: 'firebase-uid',
+			email: 'user@example.com',
+			email_verified: true,
+			id: 'profile-id',
+			roles: [UserRole.ADMIN, 'INVALID', UserRole.ADMIN],
+		});
+
+		await expect(adapter.validateToken('valid-token')).resolves.toEqual({
+			subject: 'firebase-uid',
+			id: 'profile-id',
+			email: 'user@example.com',
+			emailVerified: true,
+			roles: [UserRole.ADMIN],
+		});
+	});
+
+	it('replaces roles while preserving the profile claim', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+		rootAuth.getUser.mockResolvedValue({
 			uid: 'user-id',
 			customClaims: { id: 'app-user-id', roles: [] },
 		});
 
-		await adapter.assignUserRoles({
-			email: 'admin@example.com',
-			roles: [UserRole.ADMINISTRATOR],
+		await adapter.setUserClaims({
+			subject: 'user-id',
+			roles: [UserRole.ADMIN],
 		});
 
 		expect(rootAuth.setCustomUserClaims).toHaveBeenCalledWith('user-id', {
 			id: 'app-user-id',
-			roles: [UserRole.ADMINISTRATOR],
+			roles: [UserRole.ADMIN],
 		});
-		expect(rootAuth.revokeRefreshTokens).toHaveBeenCalledWith('user-id');
+		expect(rootAuth.revokeRefreshTokens).not.toHaveBeenCalled();
+	});
+
+	it('enables and disables Firebase users explicitly', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+
+		await adapter.enableUser('user-id');
+		await adapter.disableUser('user-id');
+
+		expect(rootAuth.updateUser).toHaveBeenNthCalledWith(1, 'user-id', {
+			disabled: false,
+		});
+		expect(rootAuth.updateUser).toHaveBeenNthCalledWith(2, 'user-id', {
+			disabled: true,
+		});
+	});
+
+	it('marks a Firebase email as verified', async () => {
+		const adapter = new FirebaseAuthAdapter(config as never);
+
+		await adapter.markEmailVerified('user-id');
+
+		expect(rootAuth.updateUser).toHaveBeenCalledWith('user-id', {
+			emailVerified: true,
+		});
 	});
 });

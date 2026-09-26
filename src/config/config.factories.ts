@@ -23,6 +23,10 @@ export const databaseConfig = registerAs('database', () => ({
 	runtimeUrl: env.DATABASE_URL as string,
 }));
 
+export const redisConfig = registerAs('redis', () => ({
+	url: env.REDIS_URL as string,
+}));
+
 export const authConfig = registerAs('auth', () => ({
 	firebase: {
 		projectId: env.FIREBASE_PROJECT_ID as string,
@@ -31,6 +35,8 @@ export const authConfig = registerAs('auth', () => ({
 			'\n',
 		),
 		clientEmail: env.FIREBASE_CLIENT_EMAIL as string,
+		emailVerificationHmacSecret:
+			env.EMAIL_VERIFICATION_HMAC_SECRET as string,
 	},
 }));
 
@@ -44,6 +50,9 @@ export const mailConfig = registerAs('mail', () => {
 				senderEmail: env.BREVO_SENDER_EMAIL as string,
 			} satisfies BrevoConfig,
 		};
+	}
+	if (env.MAIL_DRIVER === 'local-capture') {
+		return { driver: 'local-capture', sendEmails: true };
 	}
 
 	return { driver: 'noop' as const, sendEmails: false as const };

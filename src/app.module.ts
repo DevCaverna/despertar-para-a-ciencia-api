@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 
+import { RedisModule } from '@nestjs-modules/ioredis';
 import {
 	MiddlewareConsumer,
 	Module,
@@ -21,12 +22,14 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthGuard } from './auth/presentation/auth.guard.js';
 import { AppConfigModule } from './config/config.module.js';
 import type { AppConfig } from './config/config.types.js';
+import { EmailVerificationRateLimitMiddleware } from './http/email-verification-rate-limit.middleware.js';
 import { createPinoHttpOptions, requestId } from './http/pino.config.js';
 import { PublicDatabaseRateLimitMiddleware } from './http/public-database-rate-limit.middleware.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TelemetryShutdownService } from './telemetry/telemetry-shutdown.service.js';
+import { UserModule } from './user/user.module.js';
 
 @Module({
 	imports: [
@@ -91,8 +94,17 @@ import { TelemetryShutdownService } from './telemetry/telemetry-shutdown.service
 				AcceptLanguageResolver,
 			],
 		}),
+		RedisModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: (config: ConfigService<AppConfig, true>) => ({
+				type: 'single',
+				url: config.getOrThrow('redis.url', { infer: true }),
+			}),
+		}),
 		PrismaModule,
 		AuthModule,
+		UserModule,
 		MailModule,
 		StorageModule,
 	],
@@ -122,5 +134,10 @@ export class AppModule implements NestModule {
 		consumer
 			.apply(PublicDatabaseRateLimitMiddleware)
 			.forRoutes({ path: 'health/ready', method: RequestMethod.GET });
+
+		consumer.apply(EmailVerificationRateLimitMiddleware).forRoutes({
+			path: 'users/send-email-verification-code',
+			method: RequestMethod.POST,
+		});
 	}
 }

@@ -3,6 +3,7 @@ import {
 	ExecutionContext,
 	ForbiddenException,
 	Injectable,
+	ServiceUnavailableException,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -45,9 +46,19 @@ export class AuthGuard implements CanActivate {
 			try {
 				user = await this.authService.validateToken(token);
 				request.user = user;
-			} catch {
-				if (!isPublic) {
+			} catch (error) {
+				if (error instanceof UnauthorizedException && isPublic) {
+					user = undefined;
+				} else if (error instanceof UnauthorizedException) {
 					throw new UnauthorizedException('Invalid token');
+				} else if (error instanceof ServiceUnavailableException) {
+					throw new ServiceUnavailableException(
+						'Authentication service is unavailable',
+					);
+				} else {
+					throw new ServiceUnavailableException(
+						'Authentication service is unavailable',
+					);
 				}
 			}
 		} else if (!isPublic) {
@@ -56,7 +67,7 @@ export class AuthGuard implements CanActivate {
 
 		if (
 			requiredRoles?.length &&
-			!user?.roles?.some((role) => requiredRoles.includes(role))
+			!user?.roles.some((role) => requiredRoles.includes(role))
 		) {
 			throw new ForbiddenException(
 				`You don't have access to this resource`,

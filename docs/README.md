@@ -7,6 +7,7 @@ Este diretório registra apenas conhecimento do projeto que não deve depender d
 | Preciso entender...                 | Documento                                                             |
 | ----------------------------------- | --------------------------------------------------------------------- |
 | Arquitetura e fronteiras            | [Visão geral](arquitetura/visao-geral.md)                             |
+| Autenticação, perfis e papéis       | [Autenticação e usuários](arquitetura/autenticacao-e-usuarios.md)     |
 | Convenções específicas da aplicação | [Convenções da aplicação](desenvolvimento/convencoes-da-aplicacao.md) |
 | Alterar o banco de dados            | [Migrations do banco](desenvolvimento/migracoes-do-banco.md)          |
 | CI, imagem e cadeia de entrega      | [CI/CD](entrega/ci-cd.md)                                             |

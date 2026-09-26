@@ -15,6 +15,14 @@ function postgresUrl(variableName: string): z.ZodString {
 
 const databaseUrl = postgresUrl('DATABASE_URL');
 
+const redisUrl = z
+	.string()
+	.url()
+	.refine(
+		(value) => ['redis:', 'rediss:'].includes(new URL(value).protocol),
+		'REDIS_URL must use the Redis protocol.',
+	);
+
 const booleanValue = z
 	.enum(['true', 'false'], {
 		error: 'Value must be either "true" or "false".',
@@ -66,14 +74,16 @@ const baseEnvironmentSchema = z.object({
 		.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
 		.default('info'),
 	SEND_EMAILS: booleanValue,
-	MAIL_DRIVER: z.enum(['brevo', 'noop']),
+	MAIL_DRIVER: z.enum(['brevo', 'noop', 'local-capture']),
 	CORS_ORIGINS: corsOrigins,
 	SWAGGER_ENABLED: booleanValue,
 	API_NAME: z.string().min(1).default('Despertar para a Ciência API'),
 	DATABASE_URL: databaseUrl,
+	REDIS_URL: redisUrl,
 	FIREBASE_PROJECT_ID: z.string().min(1),
 	FIREBASE_PRIVATE_KEY: z.string().min(1),
 	FIREBASE_CLIENT_EMAIL: z.string().email(),
+	EMAIL_VERIFICATION_HMAC_SECRET: z.string().min(32),
 	BREVO_API_KEY: optionalString,
 	BREVO_SENDER_EMAIL: optionalEmail,
 	STORAGE_DRIVER: z.enum(['memory', 'r2']),
@@ -114,6 +124,18 @@ export const environmentSchema = baseEnvironmentSchema.superRefine(
 					});
 				}
 			}
+		}
+
+		if (
+			environment.MAIL_DRIVER === 'local-capture' &&
+			(environment.NODE_ENV !== 'development' || !environment.SEND_EMAILS)
+		) {
+			context.addIssue({
+				code: 'custom',
+				path: ['MAIL_DRIVER'],
+				message:
+					'MAIL_DRIVER=local-capture requires NODE_ENV=development and SEND_EMAILS=true.',
+			});
 		}
 
 		if (environment.STORAGE_DRIVER === 'r2') {

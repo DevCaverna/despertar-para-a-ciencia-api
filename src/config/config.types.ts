@@ -27,6 +27,11 @@ export type MailConfig =
 			brevo?: undefined;
 	  }
 	| {
+			driver: 'local-capture';
+			sendEmails: true;
+			brevo?: undefined;
+	  }
+	| {
 			driver: 'brevo';
 			sendEmails: boolean;
 			brevo: BrevoConfig;
@@ -51,11 +56,15 @@ export interface AppConfig {
 	database: {
 		runtimeUrl: string;
 	};
+	redis: {
+		url: string;
+	};
 	auth: {
 		firebase: {
 			projectId: string;
 			privateKey: string;
 			clientEmail: string;
+			emailVerificationHmacSecret: string;
 		};
 	};
 	mail: MailConfig;

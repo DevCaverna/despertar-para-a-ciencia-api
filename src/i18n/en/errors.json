@@ -2,5 +2,16 @@
 	"FORBIDDEN": "You don't have access to this resource",
 	"NOT_FOUND": "{entity} not found",
 	"ALREADY_EXISTS": "A {entity} with this information already exists",
-	"ERROR_SENDING_EMAIL": "Could not send the email"
+	"ERROR_SENDING_EMAIL": "Could not send the email",
+	"PROFILE_CLAIM_INVALID": "The profile identifier is invalid",
+	"PROFILE_CREATION_FAILED": "Could not create the profile",
+	"AUTH_ACCOUNT_NOT_FOUND": "The authentication account was not found",
+	"LAST_ACTIVE_ADMINISTRATOR": "The last active administrator cannot be changed",
+	"VERIFIED_EMAIL_REQUIRED": "A verified email address is required",
+	"NAME_REQUIRED": "Name is required",
+	"PROFILE_EMAIL_MISMATCH": "The profile email must match the authenticated email",
+	"SESSION_REVOCATION_PENDING": "Unable to confirm session revocation. Please try again.",
+	"USER_STATUS_RECONCILIATION_REQUIRED": "Unable to synchronize the account status. The responsible team has been notified.",
+	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "Unable to look up authentication accounts. Please try again.",
+	"EMAIL_VERIFICATION_CODE_INVALID": "The verification code is invalid or expired"
 }

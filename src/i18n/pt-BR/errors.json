@@ -2,5 +2,16 @@
 	"FORBIDDEN": "Você não tem acesso a esse recurso",
 	"NOT_FOUND": "{entity} não encontrado(a)",
 	"ALREADY_EXISTS": "Já existe um(a) {entity} com essas informações",
-	"ERROR_SENDING_EMAIL": "Erro ao enviar e-mail"
+	"ERROR_SENDING_EMAIL": "Erro ao enviar e-mail",
+	"PROFILE_CLAIM_INVALID": "A identificação do perfil é inválida",
+	"PROFILE_CREATION_FAILED": "Não foi possível criar o perfil",
+	"AUTH_ACCOUNT_NOT_FOUND": "A conta de autenticação não foi encontrada",
+	"LAST_ACTIVE_ADMINISTRATOR": "O último administrador ativo não pode ser alterado",
+	"VERIFIED_EMAIL_REQUIRED": "É necessário ter um e-mail verificado",
+	"NAME_REQUIRED": "O nome é obrigatório",
+	"PROFILE_EMAIL_MISMATCH": "O e-mail do perfil deve corresponder ao e-mail autenticado",
+	"SESSION_REVOCATION_PENDING": "Não foi possível confirmar a revogação das sessões. Tente novamente.",
+	"USER_STATUS_RECONCILIATION_REQUIRED": "Não foi possível sincronizar o estado da conta. A equipe responsável foi notificada.",
+	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "Não foi possível consultar as contas de autenticação. Tente novamente.",
+	"EMAIL_VERIFICATION_CODE_INVALID": "O código de verificação é inválido ou expirou"
 }

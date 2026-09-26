@@ -8,6 +8,8 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
+- Adicionado onboarding de usuários com códigos de verificação temporários armazenados com hash no Redis, limite de tentativas e suporte à criação de perfis autenticados pelo Firebase.
+- Adicionado suporte obrigatório ao Redis na configuração, readiness, CI e deploy da API.
 - Adicionado suporte opcional a mTLS OTLP/gRPC pelas variáveis padrão de certificado e chave cliente do OpenTelemetry.
 - Adicionada injeção de credenciais TLS OTLP como secrets de runtime no deploy Podman.
 - Adicionado workflow de release com Semantic Versioning.
@@ -19,6 +21,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Changed
 
+- Códigos de verificação deixaram de ser persistidos no PostgreSQL e passaram a usar Redis diretamente com `ioredis`.
 - Melhorada a telemetria da API com access logs estruturados, correlação entre logs e traces, métricas operacionais e redaction de dados sensíveis.
 - Reestruturada a documentação canônica do template.
 - Separada a criação imutável de releases do deploy em GitHub Environments.

@@ -41,8 +41,10 @@ write_required MAIL_DRIVER
 write_optional CORS_ORIGINS
 write_required SWAGGER_ENABLED
 write_required DATABASE_URL
+write_required REDIS_URL
 write_required FIREBASE_PROJECT_ID
 write_required FIREBASE_CLIENT_EMAIL
+write_required EMAIL_VERIFICATION_HMAC_SECRET
 
 firebase_private_key=$(printenv FIREBASE_PRIVATE_KEY || true)
 if [ -z "$firebase_private_key" ]; then

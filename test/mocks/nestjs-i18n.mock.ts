@@ -69,3 +69,9 @@ export class I18nValidationExceptionFilter implements ExceptionFilter {
 		response.status(exception.getStatus()).json(exception.getResponse());
 	}
 }
+
+export function i18nValidationMessage<T>(
+	_key: T extends unknown ? string : never,
+): T extends unknown ? string : never {
+	return _key;
+}

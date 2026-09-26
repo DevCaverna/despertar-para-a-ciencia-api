@@ -6,39 +6,25 @@ export const AUTH_PORT = Symbol('AuthPort');
 export interface AuthPort {
 	validateToken(token: string): Promise<AuthUser>;
 
-	markEmailAsVerified({
-		id,
-		email,
-	}: {
-		id: string;
-		email: string;
-	}): Promise<void>;
-
-	assignUserRoles({
-		roles,
-		email,
-	}: {
-		email: string;
-		roles: UserRole[];
-	}): Promise<void>;
-
-	revokeUserRoles({
-		roles,
-		email,
-	}: {
-		email: string;
-		roles: UserRole[];
-	}): Promise<void>;
-
-	updatePassword({
-		email,
-		password,
-	}: {
-		email: string;
-		password: string;
-	}): Promise<void>;
+	getUserBySubject(subject: string): Promise<AuthUser | undefined>;
 
 	getUserByEmail(email: string): Promise<AuthUser | undefined>;
 
-	deleteUserByEmail(email: string): Promise<void>;
+	markEmailVerified(subject: string): Promise<void>;
+
+	setUserClaims({
+		subject,
+		id,
+		roles,
+	}: {
+		subject: string;
+		id?: string;
+		roles: UserRole[];
+	}): Promise<void>;
+
+	enableUser(subject: string): Promise<void>;
+
+	disableUser(subject: string): Promise<void>;
+
+	revokeSessions(subject: string): Promise<void>;
 }

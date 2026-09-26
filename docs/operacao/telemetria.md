@@ -24,7 +24,7 @@ Payloads de request e response não são dados de observabilidade. Authorization
 
 ## Health checks
 
-`GET /health/live` não gera access log nem trace HTTP. Sucessos de `GET /health/ready` não geram access log; a verificação PostgreSQL continua produzindo trace e métrica. Falhas de readiness respondem `{ "status": "error" }` e emitem `readiness_failed` com `error.type` e dependência `postgresql`.
+`GET /health/live` não gera access log nem trace HTTP. Sucessos de `GET /health/ready` não geram access log; readiness verifica PostgreSQL e Redis em paralelo. Falhas de readiness respondem `{ "status": "error" }` e emitem `readiness_failed` com `error.type` e dependência `postgresql_or_redis`.
 
 ## Recursos e configuração
 

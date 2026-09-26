@@ -8,6 +8,7 @@ import {
 	httpConfig,
 	loggingConfig,
 	mailConfig,
+	redisConfig,
 	storageConfig,
 	telemetryConfig,
 } from './config.factories.js';
@@ -26,6 +27,7 @@ import { environmentSchema } from './config.validation.js';
 				httpConfig,
 				loggingConfig,
 				mailConfig,
+				redisConfig,
 				storageConfig,
 				telemetryConfig,
 			],
