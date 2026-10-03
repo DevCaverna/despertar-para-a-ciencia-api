@@ -25,6 +25,8 @@ export type I18nTranslations = {
         "USER_STATUS_RECONCILIATION_REQUIRED": string;
         "AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": string;
         "EMAIL_VERIFICATION_CODE_INVALID": string;
+        "POST_UPDATE_EMPTY": string;
+        "POST_NOT_DRAFT": string;
     };
     "fields": {
         "id": string;
@@ -32,6 +34,8 @@ export type I18nTranslations = {
         "domain": string;
         "email": string;
         "password": string;
+        "title": string;
+        "content": string;
     };
     "validation": {
         "IS_STRING": string;
