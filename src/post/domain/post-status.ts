@@ -1,9 +1,15 @@
-export enum PostStatus {
-	DRAFT = 'DRAFT',
-	PENDING_REVIEW = 'PENDING_REVIEW',
-	PUBLISHED = 'PUBLISHED',
-	REJECTED = 'REJECTED',
-}
+import type { Models } from '../../prisma/contract.d.ts';
+
+type PersistedPostStatus = Models.public_Post['status'];
+
+export const PostStatus = {
+	DRAFT: 'DRAFT',
+	PENDING_REVIEW: 'PENDING_REVIEW',
+	PUBLISHED: 'PUBLISHED',
+	REJECTED: 'REJECTED',
+} as const satisfies Record<PersistedPostStatus, PersistedPostStatus>;
+
+export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 
 const allowedTransitions: Readonly<Record<PostStatus, readonly PostStatus[]>> =
 	{

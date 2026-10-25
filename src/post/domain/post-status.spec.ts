@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { assertPostStatusTransition, PostStatus } from './post-status.js';
+import type { Post } from './post.js';
 
 describe('post editorial status', () => {
 	const allowedTransitions: Array<[PostStatus, PostStatus]> = [
@@ -26,5 +27,13 @@ describe('post editorial status', () => {
 		} else {
 			expect(transition).toThrow('Invalid post status transition');
 		}
+	});
+
+	it('accepts a status from the persisted Post type', () => {
+		const current: Post['status'] = PostStatus.DRAFT;
+
+		expect(() =>
+			assertPostStatusTransition(current, PostStatus.PENDING_REVIEW),
+		).not.toThrow();
 	});
 });
