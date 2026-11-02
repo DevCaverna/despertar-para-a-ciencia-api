@@ -13,5 +13,7 @@
 	"SESSION_REVOCATION_PENDING": "Unable to confirm session revocation. Please try again.",
 	"USER_STATUS_RECONCILIATION_REQUIRED": "Unable to synchronize the account status. The responsible team has been notified.",
 	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "Unable to look up authentication accounts. Please try again.",
-	"EMAIL_VERIFICATION_CODE_INVALID": "The verification code is invalid or expired"
+	"EMAIL_VERIFICATION_CODE_INVALID": "The verification code is invalid or expired",
+	"POST_UPDATE_EMPTY": "Provide a title or content to update the draft",
+	"POST_NOT_DRAFT": "Only drafts can be edited"
 }
