@@ -8,3 +8,26 @@ model User {
   createdAt   TimestamptzString @default(now())
   updatedAt   TimestamptzString @default(now())
 }
+
+enum PostStatus {
+  @@type("pg/text@1")
+  DRAFT = "DRAFT"
+  PENDING_REVIEW = "PENDING_REVIEW"
+  PUBLISHED = "PUBLISHED"
+  REJECTED = "REJECTED"
+}
+
+model Post {
+  id              Uuid                @id @default(dbgenerated("uuidv7()"))
+  authorId        Uuid
+  author          User                @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  title           String
+  content         String
+  status          PostStatus          @default(DRAFT)
+  rejectionReason String?
+  publishedAt     TimestamptzString?
+  createdAt       TimestamptzString   @default(now())
+  updatedAt       TimestamptzString   @default(now())
+
+  @@index([authorId])
+}
