@@ -13,5 +13,7 @@
 	"SESSION_REVOCATION_PENDING": "Não foi possível confirmar a revogação das sessões. Tente novamente.",
 	"USER_STATUS_RECONCILIATION_REQUIRED": "Não foi possível sincronizar o estado da conta. A equipe responsável foi notificada.",
 	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "Não foi possível consultar as contas de autenticação. Tente novamente.",
-	"EMAIL_VERIFICATION_CODE_INVALID": "O código de verificação é inválido ou expirou"
+	"EMAIL_VERIFICATION_CODE_INVALID": "O código de verificação é inválido ou expirou",
+	"POST_UPDATE_EMPTY": "Informe título ou conteúdo para atualizar o rascunho",
+	"POST_NOT_DRAFT": "Somente rascunhos podem ser editados"
 }

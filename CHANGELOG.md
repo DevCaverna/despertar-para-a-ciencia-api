@@ -8,6 +8,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
+- Adicionados endpoints autenticados para criar e editar os próprios rascunhos de Posts.
 - Adicionado onboarding de usuários com códigos de verificação temporários armazenados com hash no Redis, limite de tentativas e suporte à criação de perfis autenticados pelo Firebase.
 - Adicionado suporte obrigatório ao Redis na configuração, readiness, CI e deploy da API.
 - Adicionado suporte opcional a mTLS OTLP/gRPC pelas variáveis padrão de certificado e chave cliente do OpenTelemetry.
