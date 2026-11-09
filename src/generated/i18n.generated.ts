@@ -28,6 +28,9 @@ export type I18nTranslations = {
         "POST_UPDATE_EMPTY": string;
         "POST_DRAFT_PAGE_OUT_OF_RANGE": string;
         "POST_NOT_DRAFT": string;
+        "ACADEMIC_SOURCE_UNAVAILABLE": string;
+        "ACADEMIC_SOURCE_PAGINATION_INVALID": string;
+        "ACADEMIC_WORK_DATE_RANGE_INVALID": string;
     };
     "fields": {
         "id": string;

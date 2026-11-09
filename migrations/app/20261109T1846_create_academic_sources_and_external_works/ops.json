@@ -1,0 +1,233 @@
+[
+	{
+		"id": "table.academicSource",
+		"label": "Create table \"academicSource\"",
+		"summary": "Creates table \"academicSource\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "table",
+				"name": "academicSource"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure table \"academicSource\" does not exist",
+				"sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+				"params": ["\"public\".\"academicSource\""]
+			}
+		],
+		"execute": [
+			{
+				"description": "create table \"academicSource\"",
+				"sql": "CREATE TABLE \"public\".\"academicSource\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" uuid DEFAULT (uuidv7()) NOT NULL,\n  \"issn\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+				"params": []
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify table \"academicSource\" exists",
+				"sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+				"params": ["\"public\".\"academicSource\""]
+			}
+		]
+	},
+	{
+		"id": "table.externalWork",
+		"label": "Create table \"externalWork\"",
+		"summary": "Creates table \"externalWork\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "table",
+				"name": "externalWork"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure table \"externalWork\" does not exist",
+				"sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+				"params": ["\"public\".\"externalWork\""]
+			}
+		],
+		"execute": [
+			{
+				"description": "create table \"externalWork\"",
+				"sql": "CREATE TABLE \"public\".\"externalWork\" (\n  \"abstract\" text,\n  \"authors\" text[] NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"doi\" text NOT NULL,\n  \"id\" uuid DEFAULT (uuidv7()) NOT NULL,\n  \"journal\" text,\n  \"publicationDate\" text,\n  \"sourceId\" uuid NOT NULL,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"url\" text,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"externalWork_authors_elem_not_null_2033f92a\" CHECK (array_position(\"authors\", NULL) IS NULL)\n)",
+				"params": []
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify table \"externalWork\" exists",
+				"sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+				"params": ["\"public\".\"externalWork\""]
+			}
+		]
+	},
+	{
+		"id": "unique.academicSource.academicSource_issn_key",
+		"label": "Add unique constraint on \"academicSource\" (issn)",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "unique",
+				"name": "academicSource_issn_key",
+				"table": "academicSource"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure constraint \"academicSource_issn_key\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"academicSource_issn_key",
+					"public",
+					"\"public\".\"academicSource\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add unique constraint \"academicSource_issn_key\"",
+				"sql": "ALTER TABLE \"public\".\"academicSource\" ADD CONSTRAINT \"academicSource_issn_key\" UNIQUE (\"issn\")"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify constraint \"academicSource_issn_key\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"academicSource_issn_key",
+					"public",
+					"\"public\".\"academicSource\""
+				]
+			}
+		]
+	},
+	{
+		"id": "unique.externalWork.externalWork_doi_key",
+		"label": "Add unique constraint on \"externalWork\" (doi)",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "unique",
+				"name": "externalWork_doi_key",
+				"table": "externalWork"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure constraint \"externalWork_doi_key\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"externalWork_doi_key",
+					"public",
+					"\"public\".\"externalWork\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add unique constraint \"externalWork_doi_key\"",
+				"sql": "ALTER TABLE \"public\".\"externalWork\" ADD CONSTRAINT \"externalWork_doi_key\" UNIQUE (\"doi\")"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify constraint \"externalWork_doi_key\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"externalWork_doi_key",
+					"public",
+					"\"public\".\"externalWork\""
+				]
+			}
+		]
+	},
+	{
+		"id": "index.externalWork.externalWork_sourceId_idx_d92a2571",
+		"label": "Create index \"externalWork_sourceId_idx_d92a2571\" on \"externalWork\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "index",
+				"name": "externalWork_sourceId_idx_d92a2571",
+				"table": "externalWork"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure index \"externalWork_sourceId_idx_d92a2571\" does not exist",
+				"sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+				"params": ["\"public\".\"externalWork_sourceId_idx_d92a2571\""]
+			}
+		],
+		"execute": [
+			{
+				"description": "create index \"externalWork_sourceId_idx_d92a2571\"",
+				"sql": "CREATE INDEX \"externalWork_sourceId_idx_d92a2571\" ON \"public\".\"externalWork\" (\"sourceId\")",
+				"params": []
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify index \"externalWork_sourceId_idx_d92a2571\" exists",
+				"sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+				"params": ["\"public\".\"externalWork_sourceId_idx_d92a2571\""]
+			}
+		]
+	},
+	{
+		"id": "foreignKey.externalWork.externalWork_sourceId_fkey",
+		"label": "Add foreign key \"externalWork_sourceId_fkey\" on \"externalWork\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "foreignKey",
+				"name": "externalWork_sourceId_fkey",
+				"table": "externalWork"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure FK \"externalWork_sourceId_fkey\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"externalWork_sourceId_fkey",
+					"public",
+					"\"public\".\"externalWork\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add FK \"externalWork_sourceId_fkey\"",
+				"sql": "ALTER TABLE \"public\".\"externalWork\"\nADD CONSTRAINT \"externalWork_sourceId_fkey\"\nFOREIGN KEY (\"sourceId\")\nREFERENCES \"public\".\"academicSource\" (\"id\")\nON DELETE RESTRICT"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify FK \"externalWork_sourceId_fkey\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"externalWork_sourceId_fkey",
+					"public",
+					"\"public\".\"externalWork\""
+				]
+			}
+		]
+	}
+]

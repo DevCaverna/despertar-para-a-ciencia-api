@@ -31,3 +31,29 @@ model Post {
 
   @@index([authorId])
 }
+
+model AcademicSource {
+  id          Uuid                @id @default(dbgenerated("uuidv7()"))
+  name        String
+  issn        String              @unique
+  works       ExternalWork[]
+  createdAt   TimestamptzString   @default(now())
+  updatedAt   TimestamptzString   @default(now())
+}
+
+model ExternalWork {
+  id              Uuid                @id @default(dbgenerated("uuidv7()"))
+  sourceId        Uuid
+  source          AcademicSource      @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  doi             String              @unique
+  title           String
+  authors         String[]
+  abstract        String?
+  publicationDate String?
+  journal         String?
+  url             String?
+  createdAt       TimestamptzString   @default(now())
+  updatedAt       TimestamptzString   @default(now())
+
+  @@index([sourceId])
+}
