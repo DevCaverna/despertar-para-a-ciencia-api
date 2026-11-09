@@ -25,6 +25,9 @@ export type I18nTranslations = {
         "USER_STATUS_RECONCILIATION_REQUIRED": string;
         "AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": string;
         "EMAIL_VERIFICATION_CODE_INVALID": string;
+        "ACADEMIC_SOURCE_UNAVAILABLE": string;
+        "ACADEMIC_SOURCE_PAGINATION_INVALID": string;
+        "ACADEMIC_WORK_DATE_RANGE_INVALID": string;
     };
     "fields": {
         "id": string;

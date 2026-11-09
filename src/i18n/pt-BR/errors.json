@@ -13,5 +13,8 @@
 	"SESSION_REVOCATION_PENDING": "Não foi possível confirmar a revogação das sessões. Tente novamente.",
 	"USER_STATUS_RECONCILIATION_REQUIRED": "Não foi possível sincronizar o estado da conta. A equipe responsável foi notificada.",
 	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "Não foi possível consultar as contas de autenticação. Tente novamente.",
-	"EMAIL_VERIFICATION_CODE_INVALID": "O código de verificação é inválido ou expirou"
+	"EMAIL_VERIFICATION_CODE_INVALID": "O código de verificação é inválido ou expirou",
+	"ACADEMIC_SOURCE_UNAVAILABLE": "Não foi possível consultar a fonte acadêmica. Tente novamente.",
+	"ACADEMIC_SOURCE_PAGINATION_INVALID": "A fonte acadêmica retornou uma paginação inválida.",
+	"ACADEMIC_WORK_DATE_RANGE_INVALID": "A data inicial não pode ser posterior à data final."
 }
