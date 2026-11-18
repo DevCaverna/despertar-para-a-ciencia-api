@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, type Mock } from 'vitest';
 
 import { UserRole } from '../src/auth/domain/user-role.js';
 import { PostStatus } from '../src/post/domain/post-status.js';
@@ -17,25 +17,41 @@ describe('Published posts (PostgreSQL e2e)', () => {
 	let prisma: PrismaService;
 	let authorId: string;
 	let publishedIds: string[];
+	let draftId: string;
+	let nonPublicPosts: { id: string; content: string }[];
+	let validateToken: Mock;
 	let isolatedDatabase: Awaited<ReturnType<typeof createIsolatedDatabase>>;
 	const recentDate = '2026-11-18T12:00:00.000Z';
+	const fullContent = 'First paragraph.\n\nSecond paragraph.';
 
 	beforeAll(async () => {
 		isolatedDatabase = await createIsolatedDatabase();
 		const context = await createTestApp(isolatedDatabase.url);
 		app = context.app;
 		prisma = app.get(PrismaService);
-		context.mockAuthPort.validateToken.mockResolvedValue({
-			subject: 'reader',
-			email: 'reader@example.com',
-			emailVerified: true,
-			roles: [UserRole.USER],
-		});
+		validateToken = context.mockAuthPort.validateToken;
 		const author = await prisma.database.orm.public.User.create({
 			name: 'Public author',
 			email: `posts-${randomUUID()}@example.com`,
 		});
 		authorId = author.id;
+		const otherAuthor = await prisma.database.orm.public.User.create({
+			name: 'Other author',
+			email: `posts-${randomUUID()}@example.com`,
+		});
+		validateToken.mockImplementation((token: string) => {
+			const profile = token === 'author' ? author : otherAuthor;
+			return {
+				subject: token,
+				email:
+					token === 'reader' ? 'reader@example.com' : profile.email,
+				emailVerified: true,
+				id: token === 'reader' ? undefined : profile.id,
+				roles: [
+					token === 'reader' ? UserRole.USER : UserRole.COLLABORATOR,
+				],
+			};
+		});
 		const posts = await Promise.all(
 			[
 				{ status: PostStatus.PUBLISHED, publishedAt: recentDate },
@@ -48,11 +64,12 @@ describe('Published posts (PostgreSQL e2e)', () => {
 				{ status: PostStatus.DRAFT, publishedAt: recentDate },
 				{ status: PostStatus.PENDING_REVIEW, publishedAt: recentDate },
 				{ status: PostStatus.REJECTED, publishedAt: recentDate },
-			].map((data) =>
+			].map((data, index) =>
 				prisma.database.orm.public.Post.create({
 					authorId,
 					title: 'Post title',
-					content: 'Full content must not be exposed',
+					content:
+						index < 3 ? fullContent : `Non-public content ${index}`,
 					rejectionReason: 'Internal information',
 					...data,
 				}),
@@ -60,6 +77,8 @@ describe('Published posts (PostgreSQL e2e)', () => {
 		);
 		publishedIds = [posts[0].id, posts[1].id].sort().reverse();
 		publishedIds.push(posts[2].id);
+		draftId = posts[4].id;
+		nonPublicPosts = posts.slice(3);
 	}, 60_000);
 
 	afterAll(async () => {
@@ -127,6 +146,76 @@ describe('Published posts (PostgreSQL e2e)', () => {
 			perPage: 2,
 			hasNextPage: false,
 		});
+	});
+
+	it('returns exactly the public detail, including full content, without using authentication', async () => {
+		validateToken.mockClear();
+		await request(app.getHttpServer() as Server)
+			.get(`/posts/${publishedIds[0]}`)
+			.expect(200, {
+				id: publishedIds[0],
+				title: 'Post title',
+				content: fullContent,
+				publishedAt: recentDate,
+				author: { id: authorId, name: 'Public author' },
+			});
+		expect(validateToken).not.toHaveBeenCalled();
+	});
+
+	it('returns the same 404 for absent, undated and unpublished posts', async () => {
+		const client = request(app.getHttpServer() as Server);
+		const missing = await client
+			.get('/posts/019abcde-f000-7000-8000-000000000099')
+			.expect(404);
+		expect(missing.body).toEqual({
+			statusCode: 404,
+			error: 'Not Found',
+			message: 'errors.NOT_FOUND',
+		});
+		await Promise.all(
+			nonPublicPosts.map(async (post) => {
+				const response = await client
+					.get(`/posts/${post.id}`)
+					.expect(404);
+				expect(response.body).toEqual(missing.body);
+				expect(response.text).not.toContain(post.content);
+			}),
+		);
+		await client
+			.get(`/posts/${draftId}?status=DRAFT`)
+			.expect(404, missing.body);
+		await client.get('/posts/invalid-id').expect(400);
+	});
+
+	it('keeps draft detail private and restricted to the owner and draft state', async () => {
+		const client = request(app.getHttpServer() as Server);
+		const path = `/posts/drafts/${draftId}`;
+		await client.get(path).expect(401);
+		await client
+			.get(path)
+			.set('Authorization', 'Bearer reader')
+			.expect(403);
+		await client
+			.get(path)
+			.set('Authorization', 'Bearer other-author')
+			.expect(403);
+		const response = await client
+			.get(path)
+			.set('Authorization', 'Bearer author')
+			.expect(200);
+		expect(response.body).toMatchObject({
+			id: draftId,
+			authorId,
+			status: PostStatus.DRAFT,
+		});
+		await client
+			.get(`/posts/${draftId}`)
+			.set('Authorization', 'Bearer author')
+			.expect(404);
+		await client
+			.get(`/posts/drafts/${publishedIds[0]}`)
+			.set('Authorization', 'Bearer author')
+			.expect(409);
 	});
 
 	it('validates pagination and refuses client-controlled status with the application pipeline', async () => {

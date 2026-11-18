@@ -1,13 +1,16 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
 	ApiBadRequestResponse,
+	ApiNotFoundResponse,
 	ApiOkResponse,
 	ApiOperation,
+	ApiParam,
 	ApiTags,
 } from '@nestjs/swagger';
 
 import { Public } from '../decorators/public.decorator.js';
 import { ListPublishedPostsQueryDto } from './dto/list-published-posts-query.dto.js';
+import { PublishedPostDetailModel } from './models/published-post-detail.model.js';
 import { PublishedPostPageModel } from './models/published-post-page.model.js';
 import { PostService } from './post.service.js';
 
@@ -49,5 +52,28 @@ export class PublicPostController {
 		@Query() query: ListPublishedPostsQueryDto,
 	): Promise<PublishedPostPageModel> {
 		return this.posts.listPublished(query);
+	}
+
+	@Get(':id')
+	@Public()
+	@ApiOperation({
+		summary: 'Read a published post',
+		description:
+			'Public access without authentication. Returns the full content of a published post with a publication date.',
+	})
+	@ApiParam({
+		name: 'id',
+		description: 'Post UUIDv7',
+		schema: { type: 'string', format: 'uuid' },
+	})
+	@ApiOkResponse({ type: PublishedPostDetailModel })
+	@ApiBadRequestResponse({ description: 'Invalid UUIDv7.' })
+	@ApiNotFoundResponse({
+		description: 'Post does not exist or is not publicly available.',
+	})
+	getPublished(
+		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
+	): Promise<PublishedPostDetailModel> {
+		return this.posts.getPublished(id);
 	}
 }

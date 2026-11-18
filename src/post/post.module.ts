@@ -8,6 +8,7 @@ import { PublicPostController } from './public-post.controller.js';
 
 @Module({
 	imports: [PrismaModule, UserModule],
+	// Register GET /posts/drafts before the public GET /posts/:id.
 	controllers: [PostController, PublicPostController],
 	providers: [PostService],
 })
