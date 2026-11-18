@@ -190,9 +190,9 @@ async function main(): Promise<void> {
 						? userRecord.customClaims.roles.filter(
 								(role): role is UserRole =>
 									typeof role === 'string' &&
-									Object.values(UserRole).includes(
-										role as UserRole,
-									),
+									new Set<string>(
+										Object.values(UserRole),
+									).has(role),
 							)
 						: []),
 					UserRole.ADMIN,

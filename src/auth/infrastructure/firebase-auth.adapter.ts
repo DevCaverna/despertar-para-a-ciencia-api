@@ -228,10 +228,10 @@ export class FirebaseAuthAdapter implements AuthPort {
 			return [];
 		}
 
-		const validRoles = new Set(Object.values(UserRole));
+		const validRoles = new Set<string>(Object.values(UserRole));
 		return [...new Set(value)].filter(
 			(role): role is UserRole =>
-				typeof role === 'string' && validRoles.has(role as UserRole),
+				typeof role === 'string' && validRoles.has(role),
 		);
 	}
 }
