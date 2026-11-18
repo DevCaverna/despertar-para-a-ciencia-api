@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UserRole } from '../../auth/domain/user-role.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import type { AcademicWorkRepository } from '../infrastructure/academic-work.repository.js';
 import {
 	AcademicWorkSourceError,
 	type AcademicWorkSourcePort,
@@ -31,37 +32,17 @@ describe('AcademicWorkService', () => {
 	let service: AcademicWorkService;
 	let search: ReturnType<typeof vi.fn>;
 	let userFirst: ReturnType<typeof vi.fn>;
-	let sourceFirst: ReturnType<typeof vi.fn>;
-	let sourceCreate: ReturnType<typeof vi.fn>;
-	let workCreate: ReturnType<typeof vi.fn>;
-	let importedDois: Set<string>;
+	let importWorks: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
-		importedDois = new Set();
 		search = vi.fn().mockResolvedValue({ items: [] });
 		userFirst = vi.fn().mockResolvedValue({ id: actor.id, active: true });
-		sourceFirst = vi.fn().mockResolvedValue(undefined);
-		sourceCreate = vi.fn().mockResolvedValue({ id: 'source-id' });
-		workCreate = vi.fn().mockImplementation(({ doi }: { doi: string }) => {
-			if (importedDois.has(doi)) {
-				return Promise.reject({
-					code: '23505',
-					constraint: 'externalWork_doi_key',
-				});
-			}
-			importedDois.add(doi);
-			return Promise.resolve({ id: doi });
-		});
+		importWorks = vi.fn().mockResolvedValue(0);
 		const prisma = {
 			database: {
 				orm: {
 					public: {
 						User: { where: vi.fn(() => ({ first: userFirst })) },
-						AcademicSource: {
-							where: vi.fn(() => ({ first: sourceFirst })),
-							create: sourceCreate,
-						},
-						ExternalWork: { create: workCreate },
 					},
 				},
 			},
@@ -81,11 +62,13 @@ describe('AcademicWorkService', () => {
 			{
 				t: (key: string) => messages[key] ?? key,
 			} as never,
+			{ importWorks } as unknown as AcademicWorkRepository,
 		);
 	});
 
 	it('imports works and ignores known DOIs on retry', async () => {
 		search.mockResolvedValue({ items: [firstWork, secondWork] });
+		importWorks.mockResolvedValueOnce(2);
 
 		await expect(service.sync(actor, request)).resolves.toEqual({
 			found: 2,
@@ -97,16 +80,10 @@ describe('AcademicWorkService', () => {
 			imported: 0,
 			ignored: 2,
 		});
-		expect(sourceCreate).toHaveBeenCalledWith({
-			issn: '1234567X',
-			name: 'Science Journal',
-		});
-		expect(workCreate).toHaveBeenCalledWith(
-			expect.objectContaining({
-				doi: firstWork.externalId,
-				abstract: null,
-			}),
-		);
+		expect(importWorks).toHaveBeenCalledWith('1234567X', request.name, [
+			firstWork,
+			secondWork,
+		]);
 	});
 
 	it('follows source cursors and returns a continuation cursor at the page cap', async () => {
@@ -136,7 +113,7 @@ describe('AcademicWorkService', () => {
 		await expect(
 			service.sync(actor, { ...request, cursor: 'same' }),
 		).rejects.toThrow('Invalid source pagination');
-		expect(sourceCreate).not.toHaveBeenCalled();
+		expect(importWorks).not.toHaveBeenCalled();
 	});
 
 	it('rejects an inactive profile', async () => {
@@ -158,12 +135,13 @@ describe('AcademicWorkService', () => {
 	});
 
 	it('does not persist when the source fails', async () => {
-		search.mockRejectedValue(new AcademicWorkSourceError('unavailable'));
+		search
+			.mockResolvedValueOnce({ items: [firstWork], nextCursor: 'page-2' })
+			.mockRejectedValueOnce(new AcademicWorkSourceError('unavailable'));
 
 		await expect(service.sync(actor, request)).rejects.toThrow(
 			'Academic source unavailable',
 		);
-		expect(sourceCreate).not.toHaveBeenCalled();
-		expect(workCreate).not.toHaveBeenCalled();
+		expect(importWorks).not.toHaveBeenCalled();
 	});
 });

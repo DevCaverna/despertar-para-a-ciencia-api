@@ -11,6 +11,7 @@ import type { AuthUser } from '../../auth/domain/auth.types.js';
 import type { I18nTranslations } from '../../generated/i18n.generated.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { SyncAcademicWorksDto } from '../dto/sync-academic-works.dto.js';
+import { AcademicWorkRepository } from '../infrastructure/academic-work.repository.js';
 import {
 	ACADEMIC_WORK_SOURCE_PORT,
 	AcademicWorkSourceError,
@@ -35,6 +36,7 @@ export class AcademicWorkService {
 		@Inject(ACADEMIC_WORK_SOURCE_PORT)
 		private readonly source: AcademicWorkSourcePort,
 		private readonly i18n: I18nService<I18nTranslations>,
+		private readonly repository: AcademicWorkRepository,
 	) {}
 
 	async sync(
@@ -69,60 +71,16 @@ export class AcademicWorkService {
 			new Set(),
 		);
 
-		const database = this.prisma.database.orm.public;
-		let academicSource = await database.AcademicSource.where({
+		const imported = await this.repository.importWorks(
 			issn,
-		}).first();
-		if (!academicSource) {
-			try {
-				academicSource = await database.AcademicSource.create({
-					issn,
-					name: request.name,
-				});
-			} catch (error) {
-				if (!this.isUniqueViolation(error, 'academicSource_issn_key')) {
-					throw error;
-				}
-				academicSource = await database.AcademicSource.where({
-					issn,
-				}).first();
-				if (!academicSource) throw error;
-			}
-		}
-
-		const { imported, ignored } = await candidates.reduce<
-			Promise<{ imported: number; ignored: number }>
-		>(
-			async (previous, candidate) => {
-				const counts = await previous;
-				try {
-					await database.ExternalWork.create({
-						sourceId: academicSource.id,
-						doi: candidate.externalId,
-						title: candidate.title,
-						authors: candidate.authors,
-						abstract: candidate.abstract ?? null,
-						publicationDate: candidate.publicationDate ?? null,
-						journal: candidate.journal ?? null,
-						url: candidate.url ?? null,
-					});
-					return { ...counts, imported: counts.imported + 1 };
-				} catch (error) {
-					if (
-						!this.isUniqueViolation(error, 'externalWork_doi_key')
-					) {
-						throw error;
-					}
-					return { ...counts, ignored: counts.ignored + 1 };
-				}
-			},
-			Promise.resolve({ imported: 0, ignored: 0 }),
+			request.name,
+			candidates,
 		);
 
 		return {
 			found: candidates.length,
 			imported,
-			ignored,
+			ignored: candidates.length - imported,
 			...(nextCursor ? { nextCursor } : {}),
 		};
 	}
@@ -175,24 +133,5 @@ export class AcademicWorkService {
 				? { nextCursor: continuation.nextCursor }
 				: {}),
 		};
-	}
-
-	private isUniqueViolation(error: unknown, constraint: string): boolean {
-		let current: unknown = error;
-		while (typeof current === 'object' && current !== null) {
-			const candidate = current as {
-				code?: unknown;
-				constraint?: unknown;
-				cause?: unknown;
-			};
-			if (
-				candidate.code === '23505' &&
-				candidate.constraint === constraint
-			) {
-				return true;
-			}
-			current = candidate.cause;
-		}
-		return false;
 	}
 }
