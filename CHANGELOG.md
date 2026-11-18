@@ -10,6 +10,8 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 - Adicionado `GET /posts` público com paginação e ordenação por data de publicação, retornando apenas posts publicados com data definida e identificação pública do autor, sem conteúdo completo ou campos internos.
 - Adicionados endpoints autenticados para criar, consultar e editar os próprios rascunhos de posts, com listagem paginada.
+- Adicionada sincronização manual de trabalhos acadêmicos para administradores, com deduplicação por DOI, paginação e contagem de itens encontrados, importados e ignorados.
+- Adicionados modelos de fonte acadêmica e trabalho externo, com vínculo entre eles e unicidade de ISSN e DOI no banco de dados.
 - Adicionado adaptador de consulta ao Crossref para buscar trabalhos acadêmicos por ISSN, com filtros de publicação, paginação e normalização dos metadados.
 - Adicionado onboarding de usuários com códigos de verificação temporários armazenados com hash no Redis, limite de tentativas e suporte à criação de perfis autenticados pelo Firebase.
 - Adicionado suporte obrigatório ao Redis na configuração, readiness, CI e deploy da API.

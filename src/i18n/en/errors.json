@@ -16,5 +16,8 @@
 	"EMAIL_VERIFICATION_CODE_INVALID": "The verification code is invalid or expired",
 	"POST_UPDATE_EMPTY": "Provide a title or content to update the draft",
 	"POST_DRAFT_PAGE_OUT_OF_RANGE": "The draft page is out of range",
-	"POST_NOT_DRAFT": "Only drafts can be edited"
+	"POST_NOT_DRAFT": "Only drafts can be edited",
+	"ACADEMIC_SOURCE_UNAVAILABLE": "Unable to query the academic source. Please try again.",
+	"ACADEMIC_SOURCE_PAGINATION_INVALID": "The academic source returned invalid pagination.",
+	"ACADEMIC_WORK_DATE_RANGE_INVALID": "The start date must not be after the end date."
 }
