@@ -27,6 +27,7 @@ import { EmailVerificationRateLimitMiddleware } from './http/email-verification-
 import { createPinoHttpOptions, requestId } from './http/pino.config.js';
 import { PublicDatabaseRateLimitMiddleware } from './http/public-database-rate-limit.middleware.js';
 import { MailModule } from './mail/mail.module.js';
+import { PostModule } from './post/post.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TelemetryShutdownService } from './telemetry/telemetry-shutdown.service.js';
@@ -107,6 +108,7 @@ import { UserModule } from './user/user.module.js';
 		AcademicWorkModule,
 		AuthModule,
 		UserModule,
+		PostModule,
 		MailModule,
 		StorageModule,
 	],

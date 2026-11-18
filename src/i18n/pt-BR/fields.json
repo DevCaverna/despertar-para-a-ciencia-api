@@ -3,5 +3,7 @@
 	"name": "Nome",
 	"domain": "Domínio",
 	"email": "E-mail",
-	"password": "Senha"
+	"password": "Senha",
+	"title": "Título",
+	"content": "Conteúdo"
 }
