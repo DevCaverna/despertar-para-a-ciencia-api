@@ -131,8 +131,32 @@ describe('PostController', () => {
 			.get(`/posts/${postId}`)
 			.set('Authorization', 'Bearer valid-token')
 			.expect(200);
-		expect(listDrafts).toHaveBeenCalledWith(actor);
+		expect(listDrafts).toHaveBeenCalledWith(actor, 1, 20);
 		expect(getDraft).toHaveBeenCalledWith(actor, postId);
+	});
+
+	it('passes the requested page and page size to the service', async () => {
+		await request(app.getHttpServer() as Server)
+			.get('/posts/drafts?page=2&perPage=100')
+			.set('Authorization', 'Bearer valid-token')
+			.expect(200, [draft]);
+		expect(listDrafts).toHaveBeenCalledWith(actor, 2, 100);
+	});
+
+	it.each([
+		'page=0',
+		'page=1.5',
+		'page=abc',
+		'page=9007199254740992',
+		'perPage=0',
+		'perPage=1.5',
+		'perPage=101',
+	])('rejects invalid draft pagination (%s)', async (query) => {
+		await request(app.getHttpServer() as Server)
+			.get(`/posts/drafts?${query}`)
+			.set('Authorization', 'Bearer valid-token')
+			.expect(400);
+		expect(listDrafts).not.toHaveBeenCalled();
 	});
 
 	afterAll(async () => {

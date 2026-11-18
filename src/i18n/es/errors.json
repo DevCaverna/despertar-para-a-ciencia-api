@@ -15,5 +15,6 @@
 	"AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": "No se pudieron consultar las cuentas de autenticación. Inténtalo de nuevo.",
 	"EMAIL_VERIFICATION_CODE_INVALID": "El código de verificación es inválido o caducó",
 	"POST_UPDATE_EMPTY": "Indica un título o contenido para actualizar el borrador",
+	"POST_DRAFT_PAGE_OUT_OF_RANGE": "La página de borradores está fuera del intervalo permitido",
 	"POST_NOT_DRAFT": "Solo se pueden editar borradores"
 }

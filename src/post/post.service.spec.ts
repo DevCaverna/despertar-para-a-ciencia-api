@@ -32,6 +32,8 @@ describe('PostService', () => {
 	let first: ReturnType<typeof vi.fn>;
 	let update: ReturnType<typeof vi.fn>;
 	let where: ReturnType<typeof vi.fn>;
+	let offset: ReturnType<typeof vi.fn>;
+	let limit: ReturnType<typeof vi.fn>;
 	let all: ReturnType<typeof vi.fn>;
 	let getProfile: ReturnType<typeof vi.fn>;
 	let service: PostService;
@@ -41,7 +43,9 @@ describe('PostService', () => {
 		first = vi.fn();
 		update = vi.fn();
 		all = vi.fn(() => [draft]);
-		where = vi.fn(() => ({ update, orderBy: () => ({ all }) }));
+		limit = vi.fn(() => ({ all }));
+		offset = vi.fn(() => ({ limit }));
+		where = vi.fn(() => ({ update, orderBy: () => ({ offset }) }));
 		getProfile = vi.fn().mockResolvedValue({ id: authorId, active: true });
 		service = new PostService(
 			{
@@ -81,12 +85,23 @@ describe('PostService', () => {
 		expect(create).not.toHaveBeenCalled();
 	});
 
-	it('lists only the authenticated author’s drafts', async () => {
-		await expect(service.listDrafts(actor)).resolves.toEqual([draft]);
+	it('queries only the requested page of the authenticated author’s drafts', async () => {
+		await expect(service.listDrafts(actor, 3, 10)).resolves.toEqual([
+			draft,
+		]);
 		expect(where).toHaveBeenCalledWith({
 			authorId,
 			status: PostStatus.DRAFT,
 		});
+		expect(offset).toHaveBeenCalledWith(20);
+		expect(limit).toHaveBeenCalledWith(10);
+	});
+
+	it('rejects pages whose offset cannot be represented as a safe integer', async () => {
+		await expect(
+			service.listDrafts(actor, Number.MAX_SAFE_INTEGER, 100),
+		).rejects.toBeInstanceOf(BadRequestException);
+		expect(where).not.toHaveBeenCalled();
 	});
 
 	it('loads only an owned draft for editing', async () => {
@@ -192,7 +207,7 @@ describe('PostService', () => {
 
 	it('rejects an inactive profile on all draft operations', async () => {
 		getProfile.mockRejectedValue(new ForbiddenException());
-		await expect(service.listDrafts(actor)).rejects.toBeInstanceOf(
+		await expect(service.listDrafts(actor, 1, 20)).rejects.toBeInstanceOf(
 			ForbiddenException,
 		);
 		await expect(service.getDraft(actor, postId)).rejects.toBeInstanceOf(

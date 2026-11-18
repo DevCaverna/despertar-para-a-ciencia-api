@@ -21,7 +21,7 @@ async function createExampleApp(): Promise<NestExpressApplication> {
 	const moduleFixture = await Test.createTestingModule({
 		imports: [ExampleModule],
 	}).compile();
-	return moduleFixture.createNestApplication() as NestExpressApplication;
+	return moduleFixture.createNestApplication<NestExpressApplication>();
 }
 
 describe('setupSwagger', () => {
