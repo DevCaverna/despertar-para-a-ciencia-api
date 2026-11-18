@@ -9,11 +9,17 @@ import {
 	Query,
 } from '@nestjs/common';
 import {
+	ApiBadRequestResponse,
 	ApiBearerAuth,
+	ApiConflictResponse,
 	ApiCreatedResponse,
+	ApiForbiddenResponse,
+	ApiNotFoundResponse,
 	ApiOkResponse,
 	ApiOperation,
+	ApiParam,
 	ApiTags,
+	ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
 import type { AuthUser } from '../auth/domain/auth.types.js';
@@ -55,10 +61,26 @@ export class PostController {
 		return this.posts.listDrafts(actor, query.page, query.perPage);
 	}
 
-	@Get(':id')
+	@Get('drafts/:id')
 	@Roles(UserRole.COLLABORATOR, UserRole.ADMIN)
-	@ApiOperation({ summary: 'Get an owned draft post' })
+	@ApiOperation({
+		summary: 'Get an owned draft post',
+		description: 'Requires the COLLABORATOR or ADMIN role and ownership.',
+	})
+	@ApiParam({
+		name: 'id',
+		description: 'Post UUIDv7',
+		schema: { type: 'string', format: 'uuid' },
+	})
 	@ApiOkResponse({ type: PostModel })
+	@ApiBadRequestResponse({ description: 'Invalid UUIDv7.' })
+	@ApiUnauthorizedResponse({ description: 'Missing or invalid token.' })
+	@ApiForbiddenResponse({
+		description:
+			'Insufficient role, inactive profile, or another author’s post.',
+	})
+	@ApiNotFoundResponse({ description: 'Post not found.' })
+	@ApiConflictResponse({ description: 'The owned post is not a draft.' })
 	getDraft(
 		@Actor() actor: AuthUser,
 		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,

@@ -100,7 +100,7 @@ describe('PostController', () => {
 			.set('Authorization', 'Bearer valid-token')
 			.expect(403);
 		await request(app.getHttpServer() as Server)
-			.get(`/posts/${postId}`)
+			.get(`/posts/drafts/${postId}`)
 			.set('Authorization', 'Bearer valid-token')
 			.expect(403);
 		await request(app.getHttpServer() as Server)
@@ -109,6 +109,7 @@ describe('PostController', () => {
 			.send({ title: 'Novo título' })
 			.expect(403);
 		expect(createDraft).not.toHaveBeenCalled();
+		expect(getDraft).not.toHaveBeenCalled();
 		expect(updateDraft).not.toHaveBeenCalled();
 	});
 
@@ -128,7 +129,7 @@ describe('PostController', () => {
 			.set('Authorization', 'Bearer valid-token')
 			.expect(200);
 		await request(app.getHttpServer() as Server)
-			.get(`/posts/${postId}`)
+			.get(`/posts/drafts/${postId}`)
 			.set('Authorization', 'Bearer valid-token')
 			.expect(200);
 		expect(listDrafts).toHaveBeenCalledWith(actor, 1, 20);
@@ -176,7 +177,7 @@ describe('PostController', () => {
 			.get('/posts/drafts')
 			.expect(401);
 		await request(app.getHttpServer() as Server)
-			.get(`/posts/${postId}`)
+			.get(`/posts/drafts/${postId}`)
 			.expect(401);
 		expect(createDraft).not.toHaveBeenCalled();
 		expect(updateDraft).not.toHaveBeenCalled();

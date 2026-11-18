@@ -17,6 +17,7 @@ import type { Post } from './domain/post.js';
 import type { CreateDraftDto } from './dto/create-draft.dto.js';
 import type { ListPublishedPostsQueryDto } from './dto/list-published-posts-query.dto.js';
 import type { UpdateDraftDto } from './dto/update-draft.dto.js';
+import type { PublishedPostDetailModel } from './models/published-post-detail.model.js';
 import type {
 	PublishedPostModel,
 	PublishedPostPageModel,
@@ -70,6 +71,33 @@ export class PostService {
 			page,
 			perPage,
 			hasNextPage: items.length > perPage,
+		};
+	}
+
+	async getPublished(id: string): Promise<PublishedPostDetailModel> {
+		const post = await this.prisma.database.orm.public.Post.where({
+			id,
+			status: PostStatus.PUBLISHED,
+		})
+			.where((fields) => fields.publishedAt.isNotNull())
+			.select('id', 'title', 'content', 'publishedAt')
+			.include('author', (author) => author.select('id', 'name'))
+			.first();
+
+		if (!post || post.publishedAt === null) {
+			throw new NotFoundException(
+				this.i18n.t('errors.NOT_FOUND', { args: { entity: 'Post' } }),
+			);
+		}
+
+		return {
+			id: post.id,
+			title: post.title,
+			content: post.content,
+			publishedAt: new Date(post.publishedAt).toISOString(),
+			author: post.author
+				? { id: post.author.id, name: post.author.name }
+				: null,
 		};
 	}
 

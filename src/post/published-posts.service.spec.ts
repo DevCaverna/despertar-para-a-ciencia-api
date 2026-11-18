@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PostStatus } from './domain/post-status.js';
@@ -180,5 +180,104 @@ describe('PostService.listPublished', () => {
 		query.all.mockReturnValue([{ ...post, author: null }]);
 		const result = await service.listPublished({ page: 1, perPage: 20 });
 		expect(result.items[0].author).toBeNull();
+	});
+});
+
+describe('PostService.getPublished', () => {
+	const query = {
+		where: vi.fn(),
+		select: vi.fn(),
+		include: vi.fn(),
+		first: vi.fn(),
+	};
+	const getProfile = vi.fn();
+	const service = new PostService(
+		{ database: { orm: { public: { Post: query } } } } as never,
+		{ getProfile } as never,
+		{ t: (key: string) => key } as never,
+	);
+
+	beforeEach(() => {
+		vi.resetAllMocks();
+		query.where.mockReturnValue(query);
+		query.select.mockReturnValue(query);
+		query.include.mockReturnValue(query);
+		query.first.mockResolvedValue(post);
+	});
+
+	it('filters by id and visibility, selects only public fields and returns the full text', async () => {
+		query.first.mockResolvedValue({
+			...post,
+			publishedAt: '2026-11-18 09:00:00-03',
+		});
+		await expect(service.getPublished(post.id)).resolves.toEqual({
+			id: post.id,
+			title: post.title,
+			content: post.content,
+			publishedAt: post.publishedAt,
+			author: { id: post.author.id, name: post.author.name },
+		});
+		expect(query.where).toHaveBeenNthCalledWith(1, {
+			id: post.id,
+			status: PostStatus.PUBLISHED,
+		});
+		const isNotNull = vi.fn().mockReturnValue('not-null');
+		expect(
+			query.where.mock.calls[1][0]({ publishedAt: { isNotNull } }),
+		).toBe('not-null');
+		expect(query.select).toHaveBeenCalledExactlyOnceWith(
+			'id',
+			'title',
+			'content',
+			'publishedAt',
+		);
+		expect(query.include).toHaveBeenCalledExactlyOnceWith(
+			'author',
+			expect.any(Function),
+		);
+		const select = vi.fn();
+		query.include.mock.calls[0][1]({ select });
+		expect(select).toHaveBeenCalledExactlyOnceWith('id', 'name');
+		expect(query.first).toHaveBeenCalledOnce();
+		expect(getProfile).not.toHaveBeenCalled();
+	});
+
+	it('returns a null author when unavailable', async () => {
+		query.first.mockResolvedValue({ ...post, author: null });
+		await expect(service.getPublished(post.id)).resolves.toHaveProperty(
+			'author',
+			null,
+		);
+	});
+
+	it.each([PostStatus.DRAFT, PostStatus.PENDING_REVIEW, PostStatus.REJECTED])(
+		'does not match a %s post even if it has a publication date',
+		async (status) => {
+			const row = { ...post, status };
+			query.where.mockImplementationOnce(
+				(filter: { id: string; status: PostStatus }) => {
+					query.first.mockResolvedValue(
+						filter.id === row.id && filter.status === row.status
+							? row
+							: null,
+					);
+					return query;
+				},
+			);
+			await expect(service.getPublished(row.id)).rejects.toThrow(
+				NotFoundException,
+			);
+		},
+	);
+
+	it.each([
+		['no matching post', null],
+		['a missing publication date', { ...post, publishedAt: null }],
+	])('returns the same not-found error for %s', async (_case, row) => {
+		query.first.mockResolvedValue(row);
+		await expect(service.getPublished(post.id)).rejects.toThrow(
+			NotFoundException,
+		);
+		expect(getProfile).not.toHaveBeenCalled();
 	});
 });

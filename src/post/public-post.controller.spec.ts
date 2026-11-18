@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 
 import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
+import { NotFoundException, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
@@ -26,7 +26,12 @@ import { PublicPostController } from './public-post.controller.js';
 describe('PublicPostController HTTP', () => {
 	let app: INestApplication;
 	const listPublished = vi.fn();
+	const getPublished = vi.fn();
+	const listDrafts = vi.fn();
+	const getDraft = vi.fn();
+	const updateDraft = vi.fn();
 	const validateToken = vi.fn();
+	const editor = { subject: 'editor', roles: [UserRole.COLLABORATOR] };
 	const page = {
 		items: [
 			{
@@ -43,13 +48,23 @@ describe('PublicPostController HTTP', () => {
 		perPage: 20,
 		hasNextPage: false,
 	};
+	const detail = { ...page.items[0], content: 'Full content' };
 
 	beforeAll(async () => {
 		const module = await Test.createTestingModule({
 			controllers: [PostController, PublicPostController],
 			providers: [
 				Reflector,
-				{ provide: PostService, useValue: { listPublished } },
+				{
+					provide: PostService,
+					useValue: {
+						listPublished,
+						getPublished,
+						listDrafts,
+						getDraft,
+						updateDraft,
+					},
+				},
 				{ provide: AuthService, useValue: { validateToken } },
 				{ provide: 'APP_GUARD', useClass: AuthGuard },
 			],
@@ -66,8 +81,9 @@ describe('PublicPostController HTTP', () => {
 	});
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
 		listPublished.mockResolvedValue(page);
+		getPublished.mockResolvedValue(detail);
 		validateToken.mockResolvedValue({
 			subject: 'reader',
 			roles: [UserRole.USER],
@@ -108,6 +124,85 @@ describe('PublicPostController HTTP', () => {
 		expect(listPublished).toHaveBeenCalledWith({ page: 2, perPage: 100 });
 	});
 
+	it('routes the public detail without calling authentication or the draft handler', async () => {
+		validateToken.mockRejectedValueOnce(new Error('Auth unavailable'));
+		await request(app.getHttpServer() as Server)
+			.get(`/posts/${detail.id}`)
+			.expect(200, detail);
+		expect(getPublished).toHaveBeenCalledExactlyOnceWith(detail.id);
+		expect(validateToken).not.toHaveBeenCalled();
+		expect(getDraft).not.toHaveBeenCalled();
+	});
+
+	it.each([UserRole.USER, UserRole.COLLABORATOR, UserRole.ADMIN])(
+		'allows a reader with the %s role and no local profile claim',
+		async (role) => {
+			validateToken.mockResolvedValueOnce({
+				subject: 'reader',
+				roles: [role],
+			});
+			await request(app.getHttpServer() as Server)
+				.get(`/posts/${detail.id}`)
+				.set('Authorization', 'Bearer valid-token')
+				.expect(200, detail);
+			expect(validateToken).toHaveBeenCalledExactlyOnceWith(
+				'valid-token',
+			);
+			expect(getPublished).toHaveBeenCalledExactlyOnceWith(detail.id);
+		},
+	);
+
+	it.each(['not-a-uuid', '019abcde-f000-4000-8000-000000000002'])(
+		'rejects %s before querying the public detail',
+		async (id) => {
+			await request(app.getHttpServer() as Server)
+				.get(`/posts/${id}`)
+				.expect(400);
+			expect(getPublished).not.toHaveBeenCalled();
+		},
+	);
+
+	it('returns 404 without falling back to private lookup for an editor', async () => {
+		validateToken.mockResolvedValueOnce(editor);
+		getPublished.mockRejectedValueOnce(new NotFoundException());
+		await request(app.getHttpServer() as Server)
+			.get(`/posts/${detail.id}`)
+			.set('Authorization', 'Bearer editor')
+			.expect(404);
+		expect(getPublished).toHaveBeenCalledExactlyOnceWith(detail.id);
+		expect(getDraft).not.toHaveBeenCalled();
+	});
+
+	it('routes the static draft list, private draft detail and PATCH to their private handlers', async () => {
+		validateToken.mockResolvedValue(editor);
+		const draft = { ...detail, status: 'DRAFT' };
+		listDrafts.mockResolvedValueOnce([draft]);
+		getDraft.mockResolvedValueOnce(draft);
+		updateDraft.mockResolvedValueOnce({ ...draft, title: 'Edited' });
+		const client = request(app.getHttpServer() as Server);
+		await client
+			.get('/posts/drafts')
+			.set('Authorization', 'Bearer editor')
+			.expect(200, [draft]);
+		await client
+			.get(`/posts/drafts/${detail.id}`)
+			.set('Authorization', 'Bearer editor')
+			.expect(200, draft);
+		await client
+			.patch(`/posts/${detail.id}`)
+			.set('Authorization', 'Bearer editor')
+			.send({ title: 'Edited' })
+			.expect(200, { ...draft, title: 'Edited' });
+		expect(listDrafts).toHaveBeenCalledExactlyOnceWith(editor, 1, 20);
+		expect(getDraft).toHaveBeenCalledExactlyOnceWith(editor, detail.id);
+		expect(updateDraft).toHaveBeenCalledExactlyOnceWith(
+			editor,
+			detail.id,
+			expect.objectContaining({ title: 'Edited' }),
+		);
+		expect(getPublished).not.toHaveBeenCalled();
+	});
+
 	it.each([
 		'page=0',
 		'page=-1',
@@ -134,9 +229,7 @@ describe('PublicPostController HTTP', () => {
 	it('preserves authentication on all private draft routes', async () => {
 		const client = request(app.getHttpServer() as Server);
 		await client.get('/posts/drafts').expect(401);
-		await client
-			.get('/posts/019abcde-f000-7000-8000-000000000002')
-			.expect(401);
+		await client.get(`/posts/drafts/${detail.id}`).expect(401);
 		await client.post('/posts').send({}).expect(401);
 		await client
 			.patch('/posts/019abcde-f000-7000-8000-000000000002')
@@ -170,6 +263,67 @@ describe('PublicPostController HTTP', () => {
 		expect(operation.responses).toHaveProperty('200');
 		expect(operation.responses).toHaveProperty('400');
 		expect(document.paths['/posts'].post?.security).toEqual([
+			{ 'firebase-auth': [] },
+		]);
+		const published = document.paths['/posts/{id}'].get!;
+		expect(published.security ?? []).toEqual([]);
+		expect(published.parameters).toEqual([
+			expect.objectContaining({
+				name: 'id',
+				in: 'path',
+				required: true,
+				description: 'Post UUIDv7',
+				schema: { type: 'string', format: 'uuid' },
+			}),
+		]);
+		expect(published.responses).toMatchObject({
+			200: {
+				content: {
+					'application/json': {
+						schema: {
+							$ref: '#/components/schemas/PublishedPostDetailModel',
+						},
+					},
+				},
+			},
+			400: expect.any(Object),
+			404: expect.any(Object),
+		});
+		expect(
+			document.components?.schemas?.PublishedPostDetailModel,
+		).toMatchObject({
+			required: expect.arrayContaining([
+				'id',
+				'title',
+				'content',
+				'publishedAt',
+				'author',
+			]),
+			properties: {
+				id: { format: 'uuid' },
+				content: { type: 'string' },
+				publishedAt: { format: 'date-time' },
+				author: { nullable: true },
+			},
+		});
+		const draft = document.paths['/posts/drafts/{id}'].get!;
+		expect(draft.security).toEqual([{ 'firebase-auth': [] }]);
+		expect(draft.responses).toMatchObject({
+			200: {
+				content: {
+					'application/json': {
+						schema: { $ref: '#/components/schemas/PostModel' },
+					},
+				},
+			},
+			401: expect.any(Object),
+			403: expect.any(Object),
+			409: expect.any(Object),
+		});
+		expect(document.paths['/posts/drafts'].get?.security).toEqual([
+			{ 'firebase-auth': [] },
+		]);
+		expect(document.paths['/posts/{id}'].patch?.security).toEqual([
 			{ 'firebase-auth': [] },
 		]);
 	});
