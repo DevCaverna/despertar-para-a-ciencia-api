@@ -25,11 +25,13 @@ if (otelEndpoint) {
 		traceExporter: new OTLPTraceExporter({
 			url: otelEndpoint,
 		}),
-		metricReader: new PeriodicExportingMetricReader({
-			exporter: new OTLPMetricExporter({
-				url: otelEndpoint,
+		metricReaders: [
+			new PeriodicExportingMetricReader({
+				exporter: new OTLPMetricExporter({
+					url: otelEndpoint,
+				}),
 			}),
-		}),
+		],
 		logRecordProcessors: [
 			new BatchLogRecordProcessor({
 				exporter: new OTLPLogExporter({
