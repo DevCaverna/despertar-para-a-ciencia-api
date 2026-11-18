@@ -9,6 +9,7 @@ import { UserRole } from '../src/auth/domain/user-role.js';
 import { PostStatus } from '../src/post/domain/post-status.js';
 import type { PublishedPostPageModel } from '../src/post/models/published-post-page.model.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createIsolatedDatabase } from './helpers/isolated-database.helper.js';
 import { createTestApp } from './helpers/test-app.helper.js';
 
 describe('Published posts (PostgreSQL e2e)', () => {
@@ -16,10 +17,12 @@ describe('Published posts (PostgreSQL e2e)', () => {
 	let prisma: PrismaService;
 	let authorId: string;
 	let publishedIds: string[];
+	let isolatedDatabase: Awaited<ReturnType<typeof createIsolatedDatabase>>;
 	const recentDate = '2026-11-18T12:00:00.000Z';
 
 	beforeAll(async () => {
-		const context = await createTestApp();
+		isolatedDatabase = await createIsolatedDatabase();
+		const context = await createTestApp(isolatedDatabase.url);
 		app = context.app;
 		prisma = app.get(PrismaService);
 		context.mockAuthPort.validateToken.mockResolvedValue({
@@ -57,18 +60,14 @@ describe('Published posts (PostgreSQL e2e)', () => {
 		);
 		publishedIds = [posts[0].id, posts[1].id].sort().reverse();
 		publishedIds.push(posts[2].id);
-	});
+	}, 60_000);
 
 	afterAll(async () => {
-		if (authorId) {
-			await prisma.database.orm.public.Post.where({
-				authorId,
-			}).deleteAndCount();
-			await prisma.database.orm.public.User.where({
-				id: authorId,
-			}).delete();
+		try {
+			await app?.close();
+		} finally {
+			await isolatedDatabase?.dispose();
 		}
-		await app?.close();
 	});
 
 	it('returns only dated published posts with a safe public projection and stable date/id ordering', async () => {
@@ -143,5 +142,26 @@ describe('Published posts (PostgreSQL e2e)', () => {
 		await request(app.getHttpServer() as Server)
 			.get('/posts/drafts')
 			.expect(401);
+	});
+
+	it.each([
+		'page=100000000000000000000',
+		'page=9007199254740992&perPage=1',
+		'page=9007199254740991&perPage=100',
+		'page=9007199254740991&perPage=20',
+	])(
+		'rejects unsafe pagination %s without database errors',
+		async (query) => {
+			await request(app.getHttpServer() as Server)
+				.get(`/posts?${query}`)
+				.expect(400);
+		},
+	);
+
+	it('accepts a safe large offset supported by PostgreSQL', async () => {
+		const response = await request(app.getHttpServer() as Server)
+			.get('/posts?page=9007199254740991&perPage=1')
+			.expect(200);
+		expect(response.body).toMatchObject({ items: [], hasNextPage: false });
 	});
 });

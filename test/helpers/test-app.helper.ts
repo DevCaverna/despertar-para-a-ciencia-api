@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { I18nValidationPipe, I18nValidationExceptionFilter } from 'nestjs-i18n';
 import { Logger } from 'nestjs-pino';
@@ -7,13 +8,15 @@ import { vi, type Mock } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import { AUTH_PORT } from '../../src/auth/domain/auth.port.js';
 import type { AuthUser } from '../../src/auth/domain/auth.types.js';
+import type { AppConfig } from '../../src/config/config.types.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
 
 /**
  * Cria uma aplicação NestJS de teste completa com:
  * - Firebase/AuthPort mockado
  * - Prisma, auth e mail reais
  */
-export async function createTestApp(): Promise<{
+export async function createTestApp(databaseUrl?: string): Promise<{
 	app: INestApplication;
 	module: TestingModule;
 	mockAuthPort: Record<string, Mock>;
@@ -28,12 +31,22 @@ export async function createTestApp(): Promise<{
 		deleteUserByEmail: vi.fn().mockResolvedValue(undefined),
 	};
 
-	const module = await Test.createTestingModule({
+	const builder = Test.createTestingModule({
 		imports: [AppModule],
 	})
 		.overrideProvider(AUTH_PORT)
-		.useValue(mockAuthPort)
-		.compile();
+		.useValue(mockAuthPort);
+	if (databaseUrl) {
+		builder.overrideProvider(PrismaService).useFactory({
+			factory: () =>
+				new PrismaService(
+					new ConfigService<AppConfig, true>({
+						database: { runtimeUrl: databaseUrl },
+					}),
+				),
+		});
+	}
+	const module = await builder.compile();
 
 	const app: INestApplication = module.createNestApplication({
 		bufferLogs: true,
