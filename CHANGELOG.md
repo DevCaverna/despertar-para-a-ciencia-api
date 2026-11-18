@@ -8,6 +8,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
+- Adicionado `GET /posts/:id` público para leitura do conteúdo completo de um post publicado com data de publicação, incluindo título, autor e data.
 - Adicionado `GET /posts` público com paginação e ordenação por data de publicação, retornando apenas posts publicados com data definida e identificação pública do autor, sem conteúdo completo ou campos internos.
 - Adicionados endpoints autenticados para criar, consultar e editar os próprios rascunhos de posts, com listagem paginada.
 - Adicionada sincronização manual de trabalhos acadêmicos para administradores, com deduplicação por DOI, paginação e contagem de itens encontrados, importados e ignorados.
@@ -26,6 +27,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Changed
 
+- **Quebra de compatibilidade:** a consulta autenticada de rascunho próprio passou de `GET /posts/:id` para `GET /posts/drafts/:id`. O caminho anterior agora serve exclusivamente à leitura pública de publicações. `PATCH /posts/:id` não mudou.
 - Códigos de verificação deixaram de ser persistidos no PostgreSQL e passaram a usar Redis diretamente com `ioredis`.
 - Melhorada a telemetria da API com access logs estruturados, correlação entre logs e traces, métricas operacionais e redaction de dados sensíveis.
 - Reestruturada a documentação canônica do template.
