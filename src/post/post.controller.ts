@@ -6,6 +6,7 @@ import {
 	ParseUUIDPipe,
 	Patch,
 	Post,
+	Query,
 } from '@nestjs/common';
 import {
 	ApiBearerAuth,
@@ -21,6 +22,7 @@ import { Actor } from '../decorators/actor.decorator.js';
 import { Roles } from '../decorators/roles.decorator.js';
 import type { Post as PostEntity } from './domain/post.js';
 import { CreateDraftDto } from './dto/create-draft.dto.js';
+import { ListDraftsQueryDto } from './dto/list-drafts-query.dto.js';
 import { UpdateDraftDto } from './dto/update-draft.dto.js';
 import { PostModel } from './models/post.model.js';
 import { PostService } from './post.service.js';
@@ -46,8 +48,11 @@ export class PostController {
 	@Roles(UserRole.COLLABORATOR, UserRole.ADMIN)
 	@ApiOperation({ summary: 'List drafts owned by the authenticated author' })
 	@ApiOkResponse({ type: PostModel, isArray: true })
-	listDrafts(@Actor() actor: AuthUser): Promise<PostEntity[]> {
-		return this.posts.listDrafts(actor);
+	listDrafts(
+		@Actor() actor: AuthUser,
+		@Query() query: ListDraftsQueryDto,
+	): Promise<PostEntity[]> {
+		return this.posts.listDrafts(actor, query.page, query.perPage);
 	}
 
 	@Get(':id')

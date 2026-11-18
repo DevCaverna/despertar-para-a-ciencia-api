@@ -26,6 +26,7 @@ export type I18nTranslations = {
         "AUTH_ACCOUNT_LOOKUP_UNAVAILABLE": string;
         "EMAIL_VERIFICATION_CODE_INVALID": string;
         "POST_UPDATE_EMPTY": string;
+        "POST_DRAFT_PAGE_OUT_OF_RANGE": string;
         "POST_NOT_DRAFT": string;
     };
     "fields": {

@@ -8,7 +8,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
-- Adicionados endpoints autenticados para criar e editar os próprios rascunhos de Posts.
+- Adicionados endpoints autenticados para criar, consultar e editar os próprios rascunhos de posts, com listagem paginada.
 - Adicionado adaptador de consulta ao Crossref para buscar trabalhos acadêmicos por ISSN, com filtros de publicação, paginação e normalização dos metadados.
 - Adicionado onboarding de usuários com códigos de verificação temporários armazenados com hash no Redis, limite de tentativas e suporte à criação de perfis autenticados pelo Firebase.
 - Adicionado suporte obrigatório ao Redis na configuração, readiness, CI e deploy da API.

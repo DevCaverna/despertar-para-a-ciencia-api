@@ -36,15 +36,30 @@ export class PostService {
 		});
 	}
 
-	async listDrafts(actor: AuthUser): Promise<Post[]> {
+	async listDrafts(
+		actor: AuthUser,
+		page: number,
+		perPage: number,
+	): Promise<Post[]> {
 		this.requireEditorRole(actor);
 		const author = await this.users.getProfile(actor);
+		const offset = (page - 1) * perPage;
+		if (!Number.isSafeInteger(offset)) {
+			throw new BadRequestException(
+				this.i18n.t('errors.POST_DRAFT_PAGE_OUT_OF_RANGE'),
+			);
+		}
 		const drafts: Post[] = [];
 		for await (const draft of this.prisma.database.orm.public.Post.where({
 			authorId: author.id,
 			status: PostStatus.DRAFT,
 		})
-			.orderBy((post) => post.updatedAt.desc())
+			.orderBy([
+				(post) => post.updatedAt.desc(),
+				(post) => post.id.desc(),
+			])
+			.offset(offset)
+			.limit(perPage)
 			.all()) {
 			drafts.push(draft);
 		}
