@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PostStatus } from './domain/post-status.js';
@@ -139,6 +140,33 @@ describe('PostService.listPublished', () => {
 			hasNextPage: false,
 		});
 	});
+
+	it.each([20, 100])(
+		'rejects an unsafe computed offset with perPage %s before querying',
+		async (perPage) => {
+			await expect(
+				service.listPublished({
+					page: Number.MAX_SAFE_INTEGER,
+					perPage,
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
+			expect(query.where).not.toHaveBeenCalled();
+		},
+	);
+
+	it.each([1, 20, 100])(
+		'accepts the largest safe page for perPage %s without an arbitrary page cap',
+		async (perPage) => {
+			const page =
+				Math.floor(Number.MAX_SAFE_INTEGER / perPage) +
+				(perPage === 1 ? 0 : 1);
+			query.all.mockReturnValue([]);
+			await expect(
+				service.listPublished({ page, perPage }),
+			).resolves.toMatchObject({ items: [] });
+			expect(query.offset).toHaveBeenCalledWith((page - 1) * perPage);
+		},
+	);
 
 	it('normalizes the PostgreSQL timestamp representation to ISO 8601', async () => {
 		query.all.mockReturnValue([

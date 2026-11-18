@@ -34,6 +34,12 @@ export class PostService {
 		page,
 		perPage,
 	}: ListPublishedPostsQueryDto): Promise<PublishedPostPageModel> {
+		const offset = (page - 1) * perPage;
+		if (!Number.isSafeInteger(offset)) {
+			throw new BadRequestException(
+				'Pagination offset must be a safe integer.',
+			);
+		}
 		const items: PublishedPostModel[] = [];
 		for await (const post of this.prisma.database.orm.public.Post.where({
 			status: PostStatus.PUBLISHED,
@@ -43,7 +49,7 @@ export class PostService {
 				(fields) => fields.publishedAt.desc(),
 				(fields) => fields.id.desc(),
 			])
-			.offset((page - 1) * perPage)
+			.offset(offset)
 			.limit(perPage + 1)
 			.select('id', 'title', 'publishedAt')
 			.include('author', (author) => author.select('id', 'name'))
