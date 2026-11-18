@@ -15,7 +15,12 @@ import { UserService } from '../user/user.service.js';
 import { PostStatus } from './domain/post-status.js';
 import type { Post } from './domain/post.js';
 import type { CreateDraftDto } from './dto/create-draft.dto.js';
+import type { ListPublishedPostsQueryDto } from './dto/list-published-posts-query.dto.js';
 import type { UpdateDraftDto } from './dto/update-draft.dto.js';
+import type {
+	PublishedPostModel,
+	PublishedPostPageModel,
+} from './models/published-post-page.model.js';
 
 @Injectable()
 export class PostService {
@@ -24,6 +29,49 @@ export class PostService {
 		private readonly users: UserService,
 		private readonly i18n: I18nService<I18nTranslations>,
 	) {}
+
+	async listPublished({
+		page,
+		perPage,
+	}: ListPublishedPostsQueryDto): Promise<PublishedPostPageModel> {
+		const offset = (page - 1) * perPage;
+		if (!Number.isSafeInteger(offset)) {
+			throw new BadRequestException(
+				'Pagination offset must be a safe integer.',
+			);
+		}
+		const items: PublishedPostModel[] = [];
+		for await (const post of this.prisma.database.orm.public.Post.where({
+			status: PostStatus.PUBLISHED,
+		})
+			.where((fields) => fields.publishedAt.isNotNull())
+			.orderBy([
+				(fields) => fields.publishedAt.desc(),
+				(fields) => fields.id.desc(),
+			])
+			.offset(offset)
+			.limit(perPage + 1)
+			.select('id', 'title', 'publishedAt')
+			.include('author', (author) => author.select('id', 'name'))
+			.all()) {
+			// The database predicate excludes null dates; keep the public model non-nullable.
+			if (post.publishedAt === null) continue;
+			items.push({
+				id: post.id,
+				title: post.title,
+				publishedAt: new Date(post.publishedAt).toISOString(),
+				author: post.author
+					? { id: post.author.id, name: post.author.name }
+					: null,
+			});
+		}
+		return {
+			items: items.slice(0, perPage),
+			page,
+			perPage,
+			hasNextPage: items.length > perPage,
+		};
+	}
 
 	async createDraft(actor: AuthUser, body: CreateDraftDto): Promise<Post> {
 		this.requireEditorRole(actor);
