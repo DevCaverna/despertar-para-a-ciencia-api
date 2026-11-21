@@ -71,6 +71,46 @@ describe('PostService', () => {
 		).resolves.toEqual(draft);
 	});
 
+	it('submits only the validated draft content and returns confirmation', async () => {
+		first.mockResolvedValue(draft);
+		update.mockResolvedValue({
+			...draft,
+			status: PostStatus.PENDING_REVIEW,
+		});
+		await expect(service.submitDraft(actor, postId)).resolves.toEqual({
+			id: postId,
+			status: PostStatus.PENDING_REVIEW,
+			updatedAt: draft.updatedAt,
+		});
+		expect(where).toHaveBeenCalledWith({
+			id: postId,
+			authorId,
+			status: PostStatus.DRAFT,
+			title: draft.title,
+			content: draft.content,
+		});
+		expect(update).toHaveBeenCalledWith({
+			status: PostStatus.PENDING_REVIEW,
+			updatedAt: expect.any(String),
+		});
+	});
+
+	it('rejects insufficient persisted content without writing', async () => {
+		first.mockResolvedValue({ ...draft, content: ' \n ' });
+		await expect(service.submitDraft(actor, postId)).rejects.toBeInstanceOf(
+			BadRequestException,
+		);
+		expect(update).not.toHaveBeenCalled();
+	});
+
+	it('reports a conflict when the validated version changed before submission', async () => {
+		first.mockResolvedValue(draft);
+		update.mockResolvedValue(null);
+		await expect(service.submitDraft(actor, postId)).rejects.toBeInstanceOf(
+			ConflictException,
+		);
+	});
+
 	it('rejects a regular user before writing a draft', async () => {
 		await expect(
 			service.createDraft(
