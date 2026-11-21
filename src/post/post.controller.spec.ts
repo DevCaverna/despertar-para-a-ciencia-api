@@ -21,6 +21,7 @@ import { AuthGuard } from '../auth/presentation/auth.guard.js';
 import { PostStatus } from './domain/post-status.js';
 import { PostController } from './post.controller.js';
 import { PostService } from './post.service.js';
+import { PublicPostController } from './public-post.controller.js';
 
 const actor = {
 	subject: 'firebase-user',
@@ -48,11 +49,15 @@ describe('PostController', () => {
 	const listDrafts = vi.fn();
 	const getDraft = vi.fn();
 	const updateDraft = vi.fn();
+	const submitDraft = vi.fn();
+	const listReviewQueue = vi.fn();
+	const getReviewQueuePost = vi.fn();
+	const getPublished = vi.fn();
 	const validateToken = vi.fn();
 
 	beforeAll(async () => {
 		const module = await Test.createTestingModule({
-			controllers: [PostController],
+			controllers: [PostController, PublicPostController],
 			providers: [
 				Reflector,
 				{
@@ -62,6 +67,10 @@ describe('PostController', () => {
 						listDrafts,
 						getDraft,
 						updateDraft,
+						submitDraft,
+						listReviewQueue,
+						getReviewQueuePost,
+						getPublished,
 					},
 				},
 				{ provide: AuthService, useValue: { validateToken } },
@@ -77,6 +86,59 @@ describe('PostController', () => {
 			}),
 		);
 		await app.init();
+	});
+
+	it('submits a collaborator draft and returns an explicit confirmation', async () => {
+		const submitted = {
+			id: postId,
+			status: PostStatus.PENDING_REVIEW,
+			updatedAt: draft.updatedAt,
+		};
+		submitDraft.mockResolvedValue(submitted);
+		await request(app.getHttpServer() as Server)
+			.post(`/posts/drafts/${postId}/submit`)
+			.set('Authorization', 'Bearer valid-token')
+			.expect(200, submitted);
+		expect(submitDraft).toHaveBeenCalledWith(actor, postId);
+	});
+
+	it('routes the static queue only to the private controller and requires ADMIN', async () => {
+		const client = request(app.getHttpServer() as Server);
+		await client.get('/posts/review-queue').expect(401);
+		await client
+			.get('/posts/review-queue')
+			.set('Authorization', 'Bearer valid-token')
+			.expect(403);
+		await client
+			.get(`/posts/review-queue/${postId}`)
+			.set('Authorization', 'Bearer valid-token')
+			.expect(403);
+		const admin = { ...actor, roles: [UserRole.ADMIN] };
+		validateToken.mockResolvedValue(admin);
+		listReviewQueue.mockResolvedValue({
+			items: [],
+			page: 1,
+			perPage: 20,
+			hasNextPage: false,
+		});
+		getReviewQueuePost.mockResolvedValue({
+			id: postId,
+			content: draft.content,
+		});
+		await client
+			.get('/posts/review-queue')
+			.set('Authorization', 'Bearer valid-token')
+			.expect(200);
+		await client
+			.get(`/posts/review-queue/${postId}`)
+			.set('Authorization', 'Bearer valid-token')
+			.expect(200);
+		expect(listReviewQueue).toHaveBeenCalledExactlyOnceWith(admin, 1, 20);
+		expect(getReviewQueuePost).toHaveBeenCalledExactlyOnceWith(
+			admin,
+			postId,
+		);
+		expect(getPublished).not.toHaveBeenCalled();
 	});
 
 	beforeEach(() => {

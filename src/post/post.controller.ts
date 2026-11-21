@@ -2,6 +2,8 @@ import {
 	Body,
 	Controller,
 	Get,
+	HttpCode,
+	HttpStatus,
 	Param,
 	ParseUUIDPipe,
 	Patch,
@@ -30,6 +32,11 @@ import type { Post as PostEntity } from './domain/post.js';
 import { CreateDraftDto } from './dto/create-draft.dto.js';
 import { ListDraftsQueryDto } from './dto/list-drafts-query.dto.js';
 import { UpdateDraftDto } from './dto/update-draft.dto.js';
+import {
+	ReviewQueueDetailModel,
+	ReviewQueuePageModel,
+	SubmittedDraftModel,
+} from './models/post-review.model.js';
 import { PostModel } from './models/post.model.js';
 import { PostService } from './post.service.js';
 
@@ -86,6 +93,71 @@ export class PostController {
 		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
 	): Promise<PostEntity> {
 		return this.posts.getDraft(actor, id);
+	}
+
+	@Post('drafts/:id/submit')
+	@Roles(UserRole.COLLABORATOR, UserRole.ADMIN)
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Submit an owned draft for editorial review' })
+	@ApiOkResponse({ type: SubmittedDraftModel })
+	@ApiBadRequestResponse({
+		description: 'Invalid UUIDv7 or empty title or content.',
+	})
+	@ApiUnauthorizedResponse({ description: 'Missing or invalid token.' })
+	@ApiForbiddenResponse({
+		description:
+			'Insufficient role, inactive profile, or another author’s post.',
+	})
+	@ApiNotFoundResponse({ description: 'Post or local profile not found.' })
+	@ApiConflictResponse({
+		description: 'Post is not a draft or changed during submission.',
+	})
+	submitDraft(
+		@Actor() actor: AuthUser,
+		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
+	): Promise<SubmittedDraftModel> {
+		return this.posts.submitDraft(actor, id);
+	}
+
+	@Get('review-queue')
+	@Roles(UserRole.ADMIN)
+	@ApiOperation({
+		summary: 'List posts awaiting editorial review',
+		description: 'Ordered by updatedAt ASC, then id ASC.',
+	})
+	@ApiOkResponse({ type: ReviewQueuePageModel })
+	@ApiBadRequestResponse({ description: 'Invalid pagination.' })
+	@ApiUnauthorizedResponse({ description: 'Missing or invalid token.' })
+	@ApiForbiddenResponse({
+		description: 'Requires ADMIN and an active profile.',
+	})
+	listReviewQueue(
+		@Actor() actor: AuthUser,
+		@Query() query: ListDraftsQueryDto,
+	): Promise<ReviewQueuePageModel> {
+		return this.posts.listReviewQueue(actor, query.page, query.perPage);
+	}
+
+	@Get('review-queue/:id')
+	@Roles(UserRole.ADMIN)
+	@ApiOperation({
+		summary: 'Read the full content of a post awaiting editorial review',
+	})
+	@ApiOkResponse({ type: ReviewQueueDetailModel })
+	@ApiBadRequestResponse({ description: 'Invalid UUIDv7.' })
+	@ApiUnauthorizedResponse({ description: 'Missing or invalid token.' })
+	@ApiForbiddenResponse({
+		description: 'Requires ADMIN and an active profile.',
+	})
+	@ApiNotFoundResponse({
+		description:
+			'Post is not in the review queue or local profile not found.',
+	})
+	getReviewQueuePost(
+		@Actor() actor: AuthUser,
+		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
+	): Promise<ReviewQueueDetailModel> {
+		return this.posts.getReviewQueuePost(actor, id);
 	}
 
 	@Patch(':id')
