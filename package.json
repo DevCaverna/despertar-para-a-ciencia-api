@@ -42,7 +42,7 @@
 		"@opentelemetry/exporter-trace-otlp-grpc": "^0.301.2",
 		"@opentelemetry/instrumentation-runtime-node": "^0.38.0",
 		"@opentelemetry/sdk-logs": "^0.222.0",
-		"@opentelemetry/sdk-metrics": "^2.11.0",
+		"@opentelemetry/sdk-metrics": "^3.1.1",
 		"@opentelemetry/sdk-node": "^0.301.2",
 		"@prisma/orm-postgres": "8.0.0-rc.11",
 		"class-transformer": "^0.5.1",
