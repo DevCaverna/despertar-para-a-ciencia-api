@@ -4,17 +4,18 @@ Este diretório registra apenas conhecimento do projeto que não deve depender d
 
 ## Onde encontrar cada assunto
 
-| Preciso entender...                 | Documento                                                             |
-| ----------------------------------- | --------------------------------------------------------------------- |
-| Arquitetura e fronteiras            | [Visão geral](arquitetura/visao-geral.md)                             |
-| Autenticação, perfis e papéis       | [Autenticação e usuários](arquitetura/autenticacao-e-usuarios.md)     |
-| Convenções específicas da aplicação | [Convenções da aplicação](desenvolvimento/convencoes-da-aplicacao.md) |
-| Alterar o banco de dados            | [Migrations do banco](desenvolvimento/migracoes-do-banco.md)          |
-| CI, imagem e cadeia de entrega      | [CI/CD](entrega/ci-cd.md)                                             |
-| Releases e changelog                | [Releases e changelog](entrega/releases-e-changelog.md)               |
-| Ambientes e secrets                 | [Ambientes e segredos](operacao/ambientes-e-segredos.md)              |
-| Deploy, falhas e recuperação        | [Deploy e recuperação](operacao/deploy-e-recuperacao.md)              |
-| Telemetria emitida pela API         | [Telemetria](operacao/telemetria.md)                                  |
+| Preciso entender...                 | Documento                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| Arquitetura e fronteiras            | [Visão geral](arquitetura/visao-geral.md)                                       |
+| Fonte acadêmica do MVP              | [Decisão sobre Crossref](decisoes/0001-crossref-como-fonte-academica-do-mvp.md) |
+| Autenticação, perfis e papéis       | [Autenticação e usuários](arquitetura/autenticacao-e-usuarios.md)               |
+| Convenções específicas da aplicação | [Convenções da aplicação](desenvolvimento/convencoes-da-aplicacao.md)           |
+| Alterar o banco de dados            | [Migrations do banco](desenvolvimento/migracoes-do-banco.md)                    |
+| CI, imagem e cadeia de entrega      | [CI/CD](entrega/ci-cd.md)                                                       |
+| Releases e changelog                | [Releases e changelog](entrega/releases-e-changelog.md)                         |
+| Ambientes e secrets                 | [Ambientes e segredos](operacao/ambientes-e-segredos.md)                        |
+| Deploy, falhas e recuperação        | [Deploy e recuperação](operacao/deploy-e-recuperacao.md)                        |
+| Telemetria emitida pela API         | [Telemetria](operacao/telemetria.md)                                            |
 
 ## Fontes canônicas
 
@@ -27,7 +28,7 @@ Este diretório registra apenas conhecimento do projeto que não deve depender d
 | Implementação do banco             | Contract e `migrations/`                                     |
 | Procedimento de alteração do banco | [Migrations do banco](desenvolvimento/migracoes-do-banco.md) |
 | Mudanças notáveis                  | [`CHANGELOG.md`](../CHANGELOG.md)                            |
-| Decisões arquiteturais históricas  | ADR em `docs/decisoes/` quando existir                       |
+| Decisões arquiteturais históricas  | ADR em `docs/decisoes/`                                      |
 | Propostas em discussão             | RFC em `docs/rfcs/` quando existir                           |
 
 ## Padrão editorial
