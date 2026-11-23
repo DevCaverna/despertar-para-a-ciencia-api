@@ -62,7 +62,13 @@ describe('Academic work synchronization (e2e)', () => {
 					id: userId,
 					email: 'academic-admin@example.com',
 					emailVerified: true,
-					roles: [token === 'admin' ? UserRole.ADMIN : UserRole.USER],
+					roles: [
+						token === 'admin'
+							? UserRole.ADMIN
+							: token === 'collaborator'
+								? UserRole.COLLABORATOR
+								: UserRole.USER,
+					],
 				}),
 			),
 		};
@@ -117,6 +123,65 @@ describe('Academic work synchronization (e2e)', () => {
 			.send(payload);
 		expect(retry.status).toBe(201);
 		expect(retry.body).toEqual({ found: 1, imported: 0, ignored: 1 });
+	});
+
+	it('lists persisted works and exposes a work detail to collaborators', async () => {
+		const stored = await pool.query<{ id: string }>(
+			'SELECT id FROM public."externalWork" WHERE doi = $1',
+			[doi],
+		);
+		const id = stored.rows[0].id;
+		const list = await request(app.getHttpServer())
+			.get('/academic-works?perPage=100')
+			.set('Authorization', 'Bearer collaborator')
+			.expect(200);
+		expect(list.body).toMatchObject({ page: 1, perPage: 100 });
+		expect(list.body.items).toContainEqual({
+			id,
+			doi,
+			title: 'A scientific article',
+			authors: ['Ada Lovelace'],
+			abstract: null,
+			publicationDate: '2025-06',
+			journal: null,
+			url: null,
+			source: { id: expect.any(String), name: 'Science Journal', issn },
+		});
+		const detail = await request(app.getHttpServer())
+			.get(`/academic-works/${id}`)
+			.set('Authorization', 'Bearer collaborator')
+			.expect(200);
+		expect(detail.body).toEqual(
+			expect.objectContaining({
+				id,
+				doi,
+				source: expect.objectContaining({ issn }),
+			}),
+		);
+	});
+
+	it('rejects unauthorized and malformed consultation requests', async () => {
+		await request(app.getHttpServer()).get('/academic-works').expect(401);
+		await request(app.getHttpServer())
+			.get('/academic-works')
+			.set('Authorization', 'Bearer user')
+			.expect(403);
+		await request(app.getHttpServer())
+			.get('/academic-works?page=0')
+			.set('Authorization', 'Bearer admin')
+			.expect(400);
+		await request(app.getHttpServer())
+			.get('/academic-works/not-a-uuid')
+			.set('Authorization', 'Bearer admin')
+			.expect(400);
+		await request(app.getHttpServer())
+			.get(`/academic-works/${randomUUID()}`)
+			.set('Authorization', 'Bearer admin')
+			.expect(400);
+		await request(app.getHttpServer())
+			.get('/academic-works/019abcde-f000-7000-8000-000000000099')
+			.set('Authorization', 'Bearer admin')
+			.expect(404);
 	});
 
 	it('imports 1,000 candidates concurrently without duplicating DOIs within or across pages', async () => {
@@ -214,6 +279,36 @@ describe('Academic work synchronization (e2e)', () => {
 				imported: { type: 'integer' },
 				ignored: { type: 'integer' },
 				nextCursor: { type: 'string' },
+			},
+		});
+	});
+
+	it('documents the authenticated consultation contract in OpenAPI', () => {
+		const document = SwaggerModule.createDocument(
+			app,
+			new DocumentBuilder().build(),
+		);
+		expect(document.paths['/academic-works']?.get?.security).toEqual([
+			{ 'firebase-auth': [] },
+		]);
+		expect(
+			document.paths['/academic-works']?.get?.responses['200'],
+		).toMatchObject({
+			content: {
+				'application/json': {
+					schema: {
+						$ref: '#/components/schemas/AcademicWorkPageModel',
+					},
+				},
+			},
+		});
+		expect(
+			document.paths['/academic-works/{id}']?.get?.responses['200'],
+		).toMatchObject({
+			content: {
+				'application/json': {
+					schema: { $ref: '#/components/schemas/AcademicWorkModel' },
+				},
 			},
 		});
 	});

@@ -33,11 +33,20 @@ describe('AcademicWorkService', () => {
 	let search: ReturnType<typeof vi.fn>;
 	let userFirst: ReturnType<typeof vi.fn>;
 	let importWorks: ReturnType<typeof vi.fn>;
+	let list: ReturnType<typeof vi.fn>;
+	let get: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
 		search = vi.fn().mockResolvedValue({ items: [] });
 		userFirst = vi.fn().mockResolvedValue({ id: actor.id, active: true });
 		importWorks = vi.fn().mockResolvedValue(0);
+		list = vi.fn().mockResolvedValue({
+			items: [],
+			page: 1,
+			perPage: 20,
+			hasNextPage: false,
+		});
+		get = vi.fn().mockResolvedValue(null);
 		const prisma = {
 			database: {
 				orm: {
@@ -62,8 +71,41 @@ describe('AcademicWorkService', () => {
 			{
 				t: (key: string) => messages[key] ?? key,
 			} as never,
-			{ importWorks } as unknown as AcademicWorkRepository,
+			{ importWorks, list, get } as unknown as AcademicWorkRepository,
 		);
+	});
+
+	it('consults only persisted works after verifying the active profile', async () => {
+		await expect(
+			service.list(actor, { page: 1, perPage: 20 }),
+		).resolves.toEqual({
+			items: [],
+			page: 1,
+			perPage: 20,
+			hasNextPage: false,
+		});
+		expect(list).toHaveBeenCalledWith(1, 20);
+		expect(search).not.toHaveBeenCalled();
+	});
+
+	it('rejects an unsafe consultation offset and an inactive profile', async () => {
+		await expect(
+			service.list(actor, { page: Number.MAX_SAFE_INTEGER, perPage: 20 }),
+		).rejects.toThrow('Pagination offset must be a safe integer.');
+		expect(list).not.toHaveBeenCalled();
+		userFirst.mockResolvedValue(undefined);
+		await expect(
+			service.list(actor, { page: 1, perPage: 20 }),
+		).rejects.toThrow();
+		expect(list).not.toHaveBeenCalled();
+	});
+
+	it('returns the selected work and rejects a missing id', async () => {
+		const work = { id: actor.id, title: 'Research' };
+		get.mockResolvedValueOnce(work);
+		await expect(service.get(actor, actor.id)).resolves.toEqual(work);
+		await expect(service.get(actor, actor.id)).rejects.toThrow();
+		expect(get).toHaveBeenCalledWith(actor.id);
 	});
 
 	it('imports works and ignores known DOIs on retry', async () => {

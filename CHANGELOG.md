@@ -8,6 +8,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
+- Adicionada consulta autenticada e paginada de trabalhos acadêmicos importados, com detalhe e metadados da fonte para curadoria.
 - Adicionado `GET /posts/:id` público para leitura do conteúdo completo de um post publicado com data de publicação, incluindo título, autor e data.
 - Adicionado `GET /posts` público com paginação e ordenação por data de publicação, retornando apenas posts publicados com data definida e identificação pública do autor, sem conteúdo completo ou campos internos.
 - Adicionados endpoints autenticados para criar, consultar e editar os próprios rascunhos de posts, com listagem paginada.
