@@ -30,4 +30,3 @@ DEMO_USER_PASSWORD=dev-demo-password-123 pnpm seed:demo
 ```
 
 Nenhuma senha ou credencial real é versionada no repositório. Para importar artigos reais da Crossref após criar um administrador com `scripts/create-admin.ts`, utilize `POST /academic-works/sync` conforme [Visão geral da arquitetura](../arquitetura/visao-geral.md).
-
