@@ -3,10 +3,13 @@ import {
 	ConflictException,
 	ForbiddenException,
 	NotFoundException,
+	ServiceUnavailableException,
+	UnprocessableEntityException,
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mockUser } from '../../test/mocks/auth.mock.js';
+import { AiProviderError } from '../ai/domain/ai-draft-generator.port.js';
 import { UserRole } from '../auth/domain/user-role.js';
 import { PostStatus } from './domain/post-status.js';
 import type { Post } from './domain/post.js';
@@ -14,9 +17,11 @@ import { PostService } from './post.service.js';
 
 const authorId = '019abcde-f000-7000-8000-000000000001';
 const postId = '019abcde-f000-7000-8000-000000000002';
+const externalWorkId = '019abcde-f000-7000-8000-000000000003';
 const draft: Post = {
 	id: postId,
 	authorId,
+	externalWorkId: null,
 	title: 'Título original',
 	content: 'Conteúdo original',
 	status: PostStatus.DRAFT,
@@ -26,35 +31,62 @@ const draft: Post = {
 	updatedAt: '2026-10-02T12:00:00.000Z',
 };
 
+const sampleWork = {
+	id: externalWorkId,
+	sourceId: '019abcde-f000-7000-8000-000000000004',
+	doi: '10.1234/example',
+	title: 'Original research',
+	authors: ['Ada Lovelace'],
+	abstract: 'Study abstract.',
+	publicationDate: '2026-01',
+	journal: 'Science Journal',
+	url: 'https://example.com/article',
+	createdAt: '2026-10-01T12:00:00.000Z',
+	updatedAt: '2026-10-01T12:00:00.000Z',
+};
+
 describe('PostService', () => {
 	const actor = mockUser({ id: authorId, roles: [UserRole.COLLABORATOR] });
 	let create: ReturnType<typeof vi.fn>;
 	let first: ReturnType<typeof vi.fn>;
+	let workFirst: ReturnType<typeof vi.fn>;
 	let update: ReturnType<typeof vi.fn>;
 	let where: ReturnType<typeof vi.fn>;
 	let offset: ReturnType<typeof vi.fn>;
 	let limit: ReturnType<typeof vi.fn>;
 	let all: ReturnType<typeof vi.fn>;
 	let getProfile: ReturnType<typeof vi.fn>;
+	let generateDraft: ReturnType<typeof vi.fn>;
 	let service: PostService;
 
 	beforeEach(() => {
 		create = vi.fn();
 		first = vi.fn();
+		workFirst = vi.fn();
 		update = vi.fn();
 		all = vi.fn(() => [draft]);
 		limit = vi.fn(() => ({ all }));
 		offset = vi.fn(() => ({ limit }));
 		where = vi.fn(() => ({ update, orderBy: () => ({ offset }) }));
 		getProfile = vi.fn().mockResolvedValue({ id: authorId, active: true });
+		generateDraft = vi.fn().mockResolvedValue({
+			title: 'Título gerado',
+			content: 'Conteúdo gerado',
+		});
 		service = new PostService(
 			{
 				database: {
-					orm: { public: { Post: { create, first, where } } },
+					orm: {
+						public: {
+							Post: { create, first, where },
+							ExternalWork: { first: workFirst },
+						},
+					},
 				},
 			} as never,
 			{ getProfile } as never,
 			{ t: vi.fn((key: string) => key) } as never,
+			{ generateDraft } as never,
 		);
 	});
 
@@ -238,5 +270,97 @@ describe('PostService', () => {
 			service.updateDraft(actor, postId, {}),
 		).rejects.toBeInstanceOf(BadRequestException);
 		expect(where).not.toHaveBeenCalled();
+	});
+
+	it('generates a DRAFT post linked to the selected ExternalWork', async () => {
+		const linkedDraft = { ...draft, externalWorkId };
+		workFirst.mockResolvedValue(sampleWork);
+		first.mockResolvedValue(null);
+		create.mockResolvedValue(linkedDraft);
+
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).resolves.toEqual(linkedDraft);
+		expect(aiCallInput()).toEqual({
+			title: sampleWork.title,
+			authors: sampleWork.authors,
+			abstract: sampleWork.abstract,
+			publicationDate: sampleWork.publicationDate,
+			journal: sampleWork.journal,
+			doi: sampleWork.doi,
+			url: sampleWork.url,
+		});
+		expect(create).toHaveBeenCalledWith({
+			authorId,
+			externalWorkId,
+			title: 'Título gerado',
+			content: 'Conteúdo gerado',
+			status: PostStatus.DRAFT,
+		});
+
+		function aiCallInput(): unknown {
+			return generateDraft.mock.calls[0]?.[0];
+		}
+	});
+
+	it('rejects regular users, missing works, and works without an abstract before calling AI', async () => {
+		await expect(
+			service.generateDraftFromWork(
+				mockUser({ roles: [UserRole.USER] }),
+				externalWorkId,
+			),
+		).rejects.toBeInstanceOf(ForbiddenException);
+		expect(workFirst).not.toHaveBeenCalled();
+
+		workFirst.mockResolvedValueOnce(null);
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBeInstanceOf(NotFoundException);
+
+		workFirst.mockResolvedValueOnce({ ...sampleWork, abstract: null });
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBeInstanceOf(UnprocessableEntityException);
+		expect(generateDraft).not.toHaveBeenCalled();
+	});
+
+	it('blocks duplicate generation both before AI call and on concurrent unique violation', async () => {
+		workFirst.mockResolvedValue(sampleWork);
+		first.mockResolvedValueOnce({ ...draft, externalWorkId });
+
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBeInstanceOf(ConflictException);
+		expect(generateDraft).not.toHaveBeenCalled();
+
+		first.mockResolvedValueOnce(null);
+		create.mockRejectedValueOnce({
+			code: '23505',
+			constraint: 'post_externalWorkId_key',
+		});
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBeInstanceOf(ConflictException);
+
+		const unrelatedError = {
+			code: '23505',
+			constraint: 'other_constraint',
+		};
+		first.mockResolvedValueOnce(null);
+		create.mockRejectedValueOnce(unrelatedError);
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBe(unrelatedError);
+	});
+
+	it('maps AI provider failures to ServiceUnavailableException without creating a post', async () => {
+		workFirst.mockResolvedValue(sampleWork);
+		first.mockResolvedValue(null);
+		generateDraft.mockRejectedValueOnce(new AiProviderError('timeout'));
+
+		await expect(
+			service.generateDraftFromWork(actor, externalWorkId),
+		).rejects.toBeInstanceOf(ServiceUnavailableException);
+		expect(create).not.toHaveBeenCalled();
 	});
 });

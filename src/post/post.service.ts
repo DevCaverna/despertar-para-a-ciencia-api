@@ -4,9 +4,13 @@ import {
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
+	ServiceUnavailableException,
+	UnprocessableEntityException,
 } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
 
+import { AiDraftService } from '../ai/application/ai-draft.service.js';
+import { AiProviderError } from '../ai/domain/ai-draft-generator.port.js';
 import type { AuthUser } from '../auth/domain/auth.types.js';
 import { UserRole } from '../auth/domain/user-role.js';
 import type { I18nTranslations } from '../generated/i18n.generated.js';
@@ -23,12 +27,38 @@ import type {
 	PublishedPostPageModel,
 } from './models/published-post-page.model.js';
 
+function isExternalWorkUniqueViolation(error: unknown): boolean {
+	let current: unknown = error;
+	const visited = new Set<unknown>();
+	while (
+		typeof current === 'object' &&
+		current !== null &&
+		!visited.has(current)
+	) {
+		visited.add(current);
+		const candidate = current as {
+			code?: unknown;
+			constraint?: unknown;
+			cause?: unknown;
+		};
+		if (
+			candidate.code === '23505' &&
+			candidate.constraint === 'post_externalWorkId_key'
+		) {
+			return true;
+		}
+		current = candidate.cause;
+	}
+	return false;
+}
+
 @Injectable()
 export class PostService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly users: UserService,
 		private readonly i18n: I18nService<I18nTranslations>,
+		private readonly aiDrafts: AiDraftService,
 	) {}
 
 	async listPublished({
@@ -199,6 +229,81 @@ export class PostService {
 			throw new ConflictException(this.i18n.t('errors.POST_NOT_DRAFT'));
 		}
 		return updated;
+	}
+
+	async generateDraftFromWork(
+		actor: AuthUser,
+		externalWorkId: string,
+	): Promise<Post> {
+		this.requireEditorRole(actor);
+		const author = await this.users.getProfile(actor);
+
+		const work = await this.prisma.database.orm.public.ExternalWork.first({
+			id: externalWorkId,
+		});
+		if (!work) {
+			throw new NotFoundException(
+				this.i18n.t('errors.NOT_FOUND', {
+					args: { entity: 'ExternalWork' },
+				}),
+			);
+		}
+		if (!work.abstract?.trim()) {
+			throw new UnprocessableEntityException(
+				this.i18n.t('errors.ACADEMIC_WORK_ABSTRACT_REQUIRED'),
+			);
+		}
+
+		const existing = await this.prisma.database.orm.public.Post.first({
+			externalWorkId: work.id,
+		});
+		if (existing) {
+			throw new ConflictException(
+				this.i18n.t('errors.POST_ALREADY_EXISTS_FOR_WORK'),
+			);
+		}
+
+		let generated: { title: string; content: string };
+		try {
+			generated = await this.aiDrafts.generateDraft({
+				title: work.title,
+				authors: [...work.authors],
+				abstract: work.abstract,
+				publicationDate: work.publicationDate,
+				journal: work.journal,
+				doi: work.doi,
+				url: work.url,
+			});
+		} catch (error) {
+			if (error instanceof AiProviderError) {
+				if (error.code === 'invalid-input') {
+					throw new UnprocessableEntityException(
+						this.i18n.t('errors.ACADEMIC_WORK_ABSTRACT_REQUIRED'),
+					);
+				}
+				throw new ServiceUnavailableException(
+					this.i18n.t('errors.AI_DRAFT_GENERATION_UNAVAILABLE'),
+				);
+			}
+			throw error;
+		}
+
+		try {
+			return await this.prisma.database.orm.public.Post.create({
+				authorId: author.id,
+				externalWorkId: work.id,
+				title: generated.title,
+				content: generated.content,
+				status: PostStatus.DRAFT,
+			});
+		} catch (error) {
+			if (isExternalWorkUniqueViolation(error)) {
+				throw new ConflictException(
+					this.i18n.t('errors.POST_ALREADY_EXISTS_FOR_WORK'),
+				);
+			}
+			throw error;
+		}
 	}
 
 	private requireEditorRole(actor: AuthUser): void {

@@ -30,9 +30,11 @@ const actor = {
 	emailVerified: true,
 };
 const postId = '019abcde-f000-7000-8000-000000000002';
+const externalWorkId = '019abcde-f000-7000-8000-000000000003';
 const draft = {
 	id: postId,
 	authorId: actor.id,
+	externalWorkId: null,
 	title: 'Título',
 	content: 'Conteúdo',
 	status: PostStatus.DRAFT,
@@ -45,6 +47,7 @@ const draft = {
 describe('PostController', () => {
 	let app: INestApplication;
 	const createDraft = vi.fn();
+	const generateDraftFromWork = vi.fn();
 	const listDrafts = vi.fn();
 	const getDraft = vi.fn();
 	const updateDraft = vi.fn();
@@ -59,6 +62,7 @@ describe('PostController', () => {
 					provide: PostService,
 					useValue: {
 						createDraft,
+						generateDraftFromWork,
 						listDrafts,
 						getDraft,
 						updateDraft,
@@ -83,6 +87,7 @@ describe('PostController', () => {
 		vi.clearAllMocks();
 		validateToken.mockResolvedValue(actor);
 		createDraft.mockResolvedValue(draft);
+		generateDraftFromWork.mockResolvedValue({ ...draft, externalWorkId });
 		listDrafts.mockResolvedValue([draft]);
 		getDraft.mockResolvedValue(draft);
 		updateDraft.mockResolvedValue(draft);
@@ -231,6 +236,36 @@ describe('PostController', () => {
 			actor,
 			postId,
 			expect.objectContaining({ title: 'Novo título' }),
+		);
+	});
+
+	it('validates role and ExternalWork UUIDv7 for AI draft generation', async () => {
+		validateToken.mockResolvedValueOnce({
+			...actor,
+			roles: [UserRole.USER],
+		});
+		await request(app.getHttpServer() as Server)
+			.post('/posts/from-academic-work')
+			.set('Authorization', 'Bearer valid-token')
+			.send({ externalWorkId })
+			.expect(403);
+
+		await request(app.getHttpServer() as Server)
+			.post('/posts/from-academic-work')
+			.set('Authorization', 'Bearer valid-token')
+			.send({ externalWorkId: '550e8400-e29b-41d4-a716-446655440000' })
+			.expect(400);
+
+		expect(generateDraftFromWork).not.toHaveBeenCalled();
+
+		await request(app.getHttpServer() as Server)
+			.post('/posts/from-academic-work')
+			.set('Authorization', 'Bearer valid-token')
+			.send({ externalWorkId })
+			.expect(201);
+		expect(generateDraftFromWork).toHaveBeenCalledWith(
+			actor,
+			externalWorkId,
 		);
 	});
 });

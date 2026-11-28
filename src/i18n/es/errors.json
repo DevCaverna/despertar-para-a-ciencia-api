@@ -19,5 +19,8 @@
 	"POST_NOT_DRAFT": "Solo se pueden editar borradores",
 	"ACADEMIC_SOURCE_UNAVAILABLE": "No se pudo consultar la fuente académica. Inténtalo de nuevo.",
 	"ACADEMIC_SOURCE_PAGINATION_INVALID": "La fuente académica devolvió una paginación inválida.",
-	"ACADEMIC_WORK_DATE_RANGE_INVALID": "La fecha inicial no puede ser posterior a la fecha final."
+	"ACADEMIC_WORK_DATE_RANGE_INVALID": "La fecha inicial no puede ser posterior a la fecha final.",
+	"ACADEMIC_WORK_ABSTRACT_REQUIRED": "El trabajo académico debe tener un resumen para generar un borrador.",
+	"POST_ALREADY_EXISTS_FOR_WORK": "Ya existe una publicación vinculada a este trabajo académico.",
+	"AI_DRAFT_GENERATION_UNAVAILABLE": "No se pudo generar el borrador asistido por IA. Inténtalo de nuevo."
 }

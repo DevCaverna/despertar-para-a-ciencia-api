@@ -19,5 +19,8 @@
 	"POST_NOT_DRAFT": "Somente rascunhos podem ser editados",
 	"ACADEMIC_SOURCE_UNAVAILABLE": "Não foi possível consultar a fonte acadêmica. Tente novamente.",
 	"ACADEMIC_SOURCE_PAGINATION_INVALID": "A fonte acadêmica retornou uma paginação inválida.",
-	"ACADEMIC_WORK_DATE_RANGE_INVALID": "A data inicial não pode ser posterior à data final."
+	"ACADEMIC_WORK_DATE_RANGE_INVALID": "A data inicial não pode ser posterior à data final.",
+	"ACADEMIC_WORK_ABSTRACT_REQUIRED": "O trabalho acadêmico precisa ter um resumo para gerar um rascunho.",
+	"POST_ALREADY_EXISTS_FOR_WORK": "Já existe um post vinculado a este trabalho acadêmico.",
+	"AI_DRAFT_GENERATION_UNAVAILABLE": "Não foi possível gerar o rascunho assistido por IA. Tente novamente."
 }

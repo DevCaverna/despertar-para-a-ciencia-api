@@ -10,6 +10,9 @@ export class PostModel implements Post {
 	@ApiProperty({ format: 'uuid' })
 	authorId!: string;
 
+	@ApiProperty({ nullable: true, format: 'uuid', type: String })
+	externalWorkId!: string | null;
+
 	@ApiProperty()
 	title!: string;
 
