@@ -19,6 +19,7 @@ import {
 import type { Post } from './domain/post.js';
 import type { CreateDraftDto } from './dto/create-draft.dto.js';
 import type { ListPublishedPostsQueryDto } from './dto/list-published-posts-query.dto.js';
+import type { ReviewDecisionDto } from './dto/review-decision.dto.js';
 import type { UpdateDraftDto } from './dto/update-draft.dto.js';
 import type {
 	ReviewQueueDetailModel,
@@ -200,11 +201,11 @@ export class PostService {
 			throw new ConflictException(this.i18n.t('errors.POST_NOT_DRAFT'));
 		}
 
-		const updated = await this.prisma.database.orm.public.Post.where({
+		const [updated] = await this.prisma.database.orm.public.Post.where({
 			id,
 			authorId: author.id,
 			status: PostStatus.DRAFT,
-		}).update({
+		}).updateAll({
 			...(body.title !== undefined ? { title: body.title } : {}),
 			...(body.content !== undefined ? { content: body.content } : {}),
 			updatedAt: new Date().toISOString(),
@@ -232,13 +233,13 @@ export class PostService {
 		}
 		const status = PostStatus.PENDING_REVIEW;
 		assertPostStatusTransition(draft.status, status);
-		const updated = await this.prisma.database.orm.public.Post.where({
+		const [updated] = await this.prisma.database.orm.public.Post.where({
 			id,
 			authorId: draft.authorId,
 			status: PostStatus.DRAFT,
 			title: draft.title,
 			content: draft.content,
-		}).update({ status, updatedAt: new Date().toISOString() });
+		}).updateAll({ status, updatedAt: new Date().toISOString() });
 		if (!updated) {
 			throw new ConflictException(
 				this.i18n.t('errors.POST_SUBMISSION_CONFLICT'),
@@ -289,11 +290,8 @@ export class PostService {
 	): Promise<ReviewQueueDetailModel> {
 		await this.requireReviewer(actor);
 		const status = PostStatus.PENDING_REVIEW;
-		const post = await this.prisma.database.orm.public.Post.where({
-			id,
-			status,
-		})
-			.select('id', 'title', 'content', 'createdAt', 'updatedAt')
+		const { Post, ExternalWork } = this.prisma.database.orm.public;
+		const post = await Post.where({ id, status })
 			.include('author', (author) => author.select('id', 'name'))
 			.first();
 		if (!post) {
@@ -301,7 +299,70 @@ export class PostService {
 				this.i18n.t('errors.NOT_FOUND', { args: { entity: 'Post' } }),
 			);
 		}
-		return { ...post, status };
+
+		// The academic draft contract adds the link. Earlier contracts omit the field.
+		const externalWorkId =
+			'externalWorkId' in post && typeof post.externalWorkId === 'string'
+				? post.externalWorkId
+				: null;
+		const externalWork = externalWorkId
+			? await ExternalWork.where({ id: externalWorkId })
+					.select(
+						'id',
+						'title',
+						'authors',
+						'journal',
+						'publicationDate',
+						'abstract',
+						'doi',
+						'url',
+					)
+					.first()
+			: null;
+
+		return {
+			id: post.id,
+			title: post.title,
+			content: post.content,
+			createdAt: post.createdAt,
+			updatedAt: post.updatedAt,
+			author: post.author,
+			status,
+			externalWork,
+		};
+	}
+
+	async decideReview(
+		actor: AuthUser,
+		id: string,
+		status: ReviewDecisionDto['status'],
+	): Promise<Post> {
+		await this.requireReviewer(actor);
+		assertPostStatusTransition(PostStatus.PENDING_REVIEW, status);
+
+		const posts = this.prisma.database.orm.public.Post;
+		const updatedAt = new Date().toISOString();
+		// updateAll keeps the status predicate in the UPDATE statement.
+		const [updated] = await posts
+			.where({
+				id,
+				status: PostStatus.PENDING_REVIEW,
+			})
+			.updateAll({
+				status,
+				publishedAt: status === PostStatus.PUBLISHED ? updatedAt : null,
+				updatedAt,
+			});
+		if (updated) return updated;
+
+		if (!(await posts.first({ id }))) {
+			throw new NotFoundException(
+				this.i18n.t('errors.NOT_FOUND', { args: { entity: 'Post' } }),
+			);
+		}
+		throw new ConflictException(
+			this.i18n.t('errors.POST_REVIEW_DECISION_CONFLICT'),
+		);
 	}
 
 	private async requireReviewer(actor: AuthUser): Promise<void> {
