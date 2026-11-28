@@ -3,6 +3,7 @@ import {
 	ForbiddenException,
 	Inject,
 	Injectable,
+	NotFoundException,
 	ServiceUnavailableException,
 } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
@@ -10,8 +11,13 @@ import { I18nService } from 'nestjs-i18n';
 import type { AuthUser } from '../../auth/domain/auth.types.js';
 import type { I18nTranslations } from '../../generated/i18n.generated.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import type { ListAcademicWorksQueryDto } from '../dto/list-academic-works-query.dto.js';
 import type { SyncAcademicWorksDto } from '../dto/sync-academic-works.dto.js';
 import { AcademicWorkRepository } from '../infrastructure/academic-work.repository.js';
+import type {
+	AcademicWorkModel,
+	AcademicWorkPageModel,
+} from '../models/academic-work.model.js';
 import {
 	ACADEMIC_WORK_SOURCE_PORT,
 	AcademicWorkSourceError,
@@ -39,19 +45,38 @@ export class AcademicWorkService {
 		private readonly repository: AcademicWorkRepository,
 	) {}
 
+	async list(
+		actor: AuthUser,
+		query: ListAcademicWorksQueryDto,
+	): Promise<AcademicWorkPageModel> {
+		await this.requireActiveProfile(actor);
+		const offset = (query.page - 1) * query.perPage;
+		if (!Number.isSafeInteger(offset)) {
+			throw new BadRequestException(
+				'Pagination offset must be a safe integer.',
+			);
+		}
+		return this.repository.list(query.page, query.perPage);
+	}
+
+	async get(actor: AuthUser, id: string): Promise<AcademicWorkModel> {
+		await this.requireActiveProfile(actor);
+		const work = await this.repository.get(id);
+		if (!work) {
+			throw new NotFoundException(
+				this.i18n.t('errors.NOT_FOUND', {
+					args: { entity: 'ExternalWork' },
+				}),
+			);
+		}
+		return work;
+	}
+
 	async sync(
 		actor: AuthUser,
 		request: SyncAcademicWorksDto,
 	): Promise<SyncAcademicWorksResult> {
-		if (
-			!actor.id ||
-			!(await this.prisma.database.orm.public.User.where({
-				id: actor.id,
-				active: true,
-			}).first())
-		) {
-			throw new ForbiddenException(this.i18n.t('errors.FORBIDDEN'));
-		}
+		await this.requireActiveProfile(actor);
 		if (
 			request.fromDate &&
 			request.untilDate &&
@@ -83,6 +108,18 @@ export class AcademicWorkService {
 			ignored: candidates.length - imported,
 			...(nextCursor ? { nextCursor } : {}),
 		};
+	}
+
+	private async requireActiveProfile(actor: AuthUser): Promise<void> {
+		if (
+			!actor.id ||
+			!(await this.prisma.database.orm.public.User.where({
+				id: actor.id,
+				active: true,
+			}).first())
+		) {
+			throw new ForbiddenException(this.i18n.t('errors.FORBIDDEN'));
+		}
 	}
 
 	private async collectCandidates(

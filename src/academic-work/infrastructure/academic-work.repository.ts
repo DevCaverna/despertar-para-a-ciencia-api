@@ -2,12 +2,70 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AcademicWorkCandidate } from '../application/academic-work-source.port.js';
+import type {
+	AcademicWorkModel,
+	AcademicWorkPageModel,
+} from '../models/academic-work.model.js';
 
 const BATCH_SIZE = 100;
 
 @Injectable()
 export class AcademicWorkRepository {
 	constructor(private readonly prisma: PrismaService) {}
+
+	async list(page: number, perPage: number): Promise<AcademicWorkPageModel> {
+		const items: AcademicWorkModel[] = [];
+		for await (const work of this.prisma.database.orm.public.ExternalWork.orderBy(
+			[(fields) => fields.createdAt.desc(), (fields) => fields.id.desc()],
+		)
+			.offset((page - 1) * perPage)
+			.limit(perPage + 1)
+			.select(
+				'id',
+				'doi',
+				'title',
+				'authors',
+				'abstract',
+				'publicationDate',
+				'journal',
+				'url',
+			)
+			.include('source', (source) => source.select('id', 'name', 'issn'))
+			.all()) {
+			items.push({
+				...work,
+				authors: [...work.authors],
+				source: work.source!,
+			});
+		}
+		return {
+			items: items.slice(0, perPage),
+			page,
+			perPage,
+			hasNextPage: items.length > perPage,
+		};
+	}
+
+	async get(id: string): Promise<AcademicWorkModel | null> {
+		const work = await this.prisma.database.orm.public.ExternalWork.where({
+			id,
+		})
+			.select(
+				'id',
+				'doi',
+				'title',
+				'authors',
+				'abstract',
+				'publicationDate',
+				'journal',
+				'url',
+			)
+			.include('source', (source) => source.select('id', 'name', 'issn'))
+			.first();
+		return work
+			? { ...work, authors: [...work.authors], source: work.source! }
+			: null;
+	}
 
 	async importWorks(
 		issn: string,

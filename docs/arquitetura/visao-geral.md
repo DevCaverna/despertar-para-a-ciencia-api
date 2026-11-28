@@ -24,6 +24,8 @@ O ciclo de vida de `Post` (`DRAFT`, `PENDING_REVIEW`, `PUBLISHED`, `REJECTED`), 
 
 `POST /academic-works/sync` permite a um administrador com perfil local ativo importar trabalhos de um periódico identificado por ISSN. A aplicação consulta a fonte pela porta acadêmica, persiste `AcademicSource` e `ExternalWork` e usa a unicidade do DOI para ignorar registros já importados. A resposta informa quantos candidatos normalizados foram encontrados, importados e ignorados. Cada chamada percorre no máximo dez páginas de cem itens; quando houver mais resultados, `nextCursor` deve ser enviado como `cursor` em uma nova chamada com os mesmos filtros.
 
+`GET /academic-works` e `GET /academic-works/:id` permitem a colaboradores e administradores com perfil local ativo consultar apenas os trabalhos persistidos. A lista é paginada, ordenada por importação mais recente e ID, e retorna `items`, `page`, `perPage` e `hasNextPage`. Cada trabalho inclui DOI, título, autores, resumo e data de publicação quando presentes, periódico, URL e identificação da fonte acadêmica. A data pode conter somente ano ou ano e mês. A ausência de resumo não qualifica o trabalho para geração assistida, conforme a [ADR 0001](../decisoes/0001-crossref-como-fonte-academica-do-mvp.md).
+
 A escolha da Crossref para o MVP, a evidência da POC e suas limitações estão na [ADR 0001](../decisoes/0001-crossref-como-fonte-academica-do-mvp.md).
 
 ## Operação

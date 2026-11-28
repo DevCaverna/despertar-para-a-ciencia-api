@@ -8,6 +8,7 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) e o pro
 
 ### Added
 
+- Adicionada consulta autenticada e paginada de trabalhos acadêmicos importados, com detalhe e metadados da fonte para curadoria.
 - A revisão editorial exibe os metadados, o resumo e os links do trabalho acadêmico associado ao post.
 - Adicionado `PATCH /posts/review-queue/:id/decision` para administradores com perfil ativo publicarem ou rejeitarem posts pendentes, com registro da data de publicação.
 - Adicionada a submissão de rascunhos para revisão e a consulta paginada da fila editorial por administradores.
