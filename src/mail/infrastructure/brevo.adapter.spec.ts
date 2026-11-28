@@ -62,7 +62,7 @@ describe('BrevoAdapter', () => {
 				textContent: 'Body',
 				sender: { email: 'sender@example.com' },
 			}),
-		).rejects.toThrow('Brevo request failed with status 503');
+		).rejects.toThrow('Email delivery service is unavailable');
 		await expect(
 			adapter.sendTextEmail({
 				to: [{ email: 'recipient@example.com' }],
@@ -70,7 +70,7 @@ describe('BrevoAdapter', () => {
 				textContent: 'Body',
 				sender: { email: 'sender@example.com' },
 			}),
-		).rejects.not.toThrow('secret provider response');
+		).rejects.not.toThrow(/Brevo|503|secret provider response/);
 	});
 
 	it('propagates network timeouts for the application service to handle', async () => {
