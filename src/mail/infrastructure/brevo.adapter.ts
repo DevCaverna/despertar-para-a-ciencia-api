@@ -42,7 +42,7 @@ export class BrevoAdapter implements MailPort {
 
 				if (!response.ok) {
 					throw new BadGatewayException(
-						`Brevo request failed with status ${response.status}`,
+						'Email delivery service is unavailable',
 					);
 				}
 

@@ -3,6 +3,7 @@ import {
 	Controller,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Patch,
 	Post,
 	Query,
@@ -12,6 +13,7 @@ import {
 	ApiCreatedResponse,
 	ApiOkResponse,
 	ApiOperation,
+	ApiParam,
 	ApiTags,
 } from '@nestjs/swagger';
 
@@ -91,10 +93,15 @@ export class UserController {
 	@ApiBearerAuth('firebase-auth')
 	@Roles(UserRole.ADMIN)
 	@ApiOperation({ summary: 'Replace a user role set' })
+	@ApiParam({
+		name: 'id',
+		description: 'User UUIDv7',
+		schema: { type: 'string', format: 'uuid' },
+	})
 	@ApiOkResponse({ type: UserModel })
 	updateRoles(
 		@Actor() actor: AuthUser,
-		@Param('id') id: string,
+		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
 		@Body() body: UpdateUserRolesDto,
 	): Promise<User> {
 		return this.users.updateRoles(actor, id, body.roles);
@@ -104,10 +111,15 @@ export class UserController {
 	@ApiBearerAuth('firebase-auth')
 	@Roles(UserRole.ADMIN)
 	@ApiOperation({ summary: 'Activate or deactivate a user' })
+	@ApiParam({
+		name: 'id',
+		description: 'User UUIDv7',
+		schema: { type: 'string', format: 'uuid' },
+	})
 	@ApiOkResponse({ type: UserModel })
 	updateStatus(
 		@Actor() actor: AuthUser,
-		@Param('id') id: string,
+		@Param('id', new ParseUUIDPipe({ version: '7' })) id: string,
 		@Body() body: UpdateUserStatusDto,
 	): Promise<User> {
 		return this.users.updateStatus(actor, id, body.active);
