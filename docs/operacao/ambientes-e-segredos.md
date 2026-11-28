@@ -8,7 +8,9 @@
 
 ## GitHub Environment
 
-Cada destino de deploy usa GitHub Environment. Variáveis não sensíveis de operação são Actions Variables; credenciais de deploy, banco, Redis, Firebase, Brevo, R2 e Google são Actions Secrets. O workflow cria `runtime.env` por allowlist, temporário e com permissão `600`; o mesmo `DATABASE_URL` do runtime é usado para migrations no procedimento de deploy.
+Cada destino de deploy usa GitHub Environment. Variáveis não sensíveis de operação são Actions Variables; credenciais de deploy, banco, Redis, Firebase, Brevo, R2, Gemini e Google são Actions Secrets. O workflow cria `runtime.env` por allowlist, temporário e com permissão `600`; o mesmo `DATABASE_URL` do runtime é usado para migrations no procedimento de deploy.
+
+`AI_DRIVER` assume `noop` por padrão; ao habilitar `AI_DRIVER=gemini`, `GEMINI_API_KEY` deve ser configurada como GitHub Actions Secret no Environment de deploy (com `AI_DRIVER`, `GEMINI_MODEL` e `GEMINI_TIMEOUT_MS` como Actions Variables opcionais) e é repassada ao `runtime.env` pela allowlist.
 
 A chave privada Firebase multiline é serializada no arquivo temporário com `\n` literal. `EMAIL_VERIFICATION_HMAC_SECRET` é obrigatório, deve conter ao menos 32 caracteres aleatórios e precisa ser configurado como GitHub Actions Secret em cada Environment de deploy. Não coloque secrets em argumentos de comando, imagens OCI, logs ou arquivos persistentes da VPS.
 

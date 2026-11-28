@@ -166,6 +166,7 @@ jobs:
             - name: Transfer image and deploy
               env:
                   API_NAME: ${{ vars.API_NAME }}
+                  AI_DRIVER: ${{ vars.AI_DRIVER }}
                   BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
                   BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
                   CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
@@ -182,6 +183,9 @@ jobs:
                   FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
                   FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
                   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+                  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+                  GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+                  GEMINI_TIMEOUT_MS: ${{ vars.GEMINI_TIMEOUT_MS }}
                   EMAIL_VERIFICATION_HMAC_SECRET: ${{ secrets.EMAIL_VERIFICATION_HMAC_SECRET }}
                   DIGEST: ${{ inputs.image_digest }}
                   LOG_LEVEL: ${{ vars.LOG_LEVEL }}

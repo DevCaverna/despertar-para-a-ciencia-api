@@ -4,6 +4,7 @@ import { parseCorsOrigins } from '../utils/cors-origins.util.js';
 import type {
 	AppEnvironment,
 	BrevoConfig,
+	GeminiConfig,
 	LogLevel,
 	R2Config,
 } from './config.types.js';
@@ -73,6 +74,26 @@ export const storageConfig = registerAs('storage', () => {
 	}
 
 	return { driver: 'memory' as const };
+});
+
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_TIMEOUT_MS = 15_000;
+
+export const aiConfig = registerAs('ai', () => {
+	if (env.AI_DRIVER === 'gemini') {
+		return {
+			driver: 'gemini' as const,
+			gemini: {
+				apiKey: (env.GEMINI_API_KEY as string).trim(),
+				model: env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+				timeoutMs: env.GEMINI_TIMEOUT_MS
+					? Number(env.GEMINI_TIMEOUT_MS)
+					: DEFAULT_GEMINI_TIMEOUT_MS,
+			} satisfies GeminiConfig,
+		};
+	}
+
+	return { driver: 'noop' as const };
 });
 
 export const httpConfig = registerAs('http', () => ({

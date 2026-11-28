@@ -18,6 +18,7 @@ import {
 import { LoggerModule } from 'nestjs-pino';
 
 import { AcademicWorkModule } from './academic-work/academic-work.module.js';
+import { AiModule } from './ai/ai.module.js';
 import { AppController } from './app.controller.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthGuard } from './auth/presentation/auth.guard.js';
@@ -106,6 +107,7 @@ import { UserModule } from './user/user.module.js';
 		}),
 		PrismaModule,
 		AcademicWorkModule,
+		AiModule,
 		AuthModule,
 		UserModule,
 		PostModule,

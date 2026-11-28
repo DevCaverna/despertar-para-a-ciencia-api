@@ -30,6 +30,12 @@ declare namespace NodeJS {
 		CLOUDFLARE_R2_PUBLIC_URL?: string;
 		STORAGE_DRIVER?: 'memory' | 'r2';
 
+		// AI (Google Gemini)
+		AI_DRIVER?: 'noop' | 'gemini';
+		GEMINI_API_KEY?: string;
+		GEMINI_MODEL?: string;
+		GEMINI_TIMEOUT_MS?: string;
+
 		LOG_LEVEL?: string;
 
 		// OTel
