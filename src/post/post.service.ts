@@ -82,6 +82,11 @@ export class PostService {
 			.where((fields) => fields.publishedAt.isNotNull())
 			.select('id', 'title', 'content', 'publishedAt')
 			.include('author', (author) => author.select('id', 'name'))
+			.include('externalWork', (work) =>
+				work
+					.select('title', 'doi', 'journal', 'url')
+					.include('source', (source) => source.select('name')),
+			)
 			.first();
 
 		if (!post || post.publishedAt === null) {
@@ -98,17 +103,34 @@ export class PostService {
 			author: post.author
 				? { id: post.author.id, name: post.author.name }
 				: null,
+			academicSource: post.externalWork
+				? {
+						title: post.externalWork.title,
+						journal:
+							post.externalWork.journal ??
+							post.externalWork.source?.name ??
+							null,
+						doi: post.externalWork.doi,
+						url: post.externalWork.url,
+					}
+				: null,
 		};
 	}
 
 	async createDraft(actor: AuthUser, body: CreateDraftDto): Promise<Post> {
 		this.requireEditorRole(actor);
 		const author = await this.users.getProfile(actor);
+		if (body.externalWorkId) {
+			await this.requireExternalWork(body.externalWorkId);
+		}
 		return this.prisma.database.orm.public.Post.create({
 			authorId: author.id,
 			title: body.title,
 			content: body.content,
 			status: PostStatus.DRAFT,
+			...(body.externalWorkId
+				? { externalWorkId: body.externalWorkId }
+				: {}),
 		});
 	}
 
@@ -166,7 +188,11 @@ export class PostService {
 		body: UpdateDraftDto,
 	): Promise<Post> {
 		this.requireEditorRole(actor);
-		if (body.title === undefined && body.content === undefined) {
+		if (
+			body.title === undefined &&
+			body.content === undefined &&
+			body.externalWorkId === undefined
+		) {
 			throw new BadRequestException(
 				this.i18n.t('errors.POST_UPDATE_EMPTY'),
 			);
@@ -185,6 +211,9 @@ export class PostService {
 		if (post.status !== 'DRAFT') {
 			throw new ConflictException(this.i18n.t('errors.POST_NOT_DRAFT'));
 		}
+		if (body.externalWorkId) {
+			await this.requireExternalWork(body.externalWorkId);
+		}
 
 		const updated = await this.prisma.database.orm.public.Post.where({
 			id,
@@ -193,6 +222,9 @@ export class PostService {
 		}).update({
 			...(body.title !== undefined ? { title: body.title } : {}),
 			...(body.content !== undefined ? { content: body.content } : {}),
+			...(body.externalWorkId !== undefined
+				? { externalWorkId: body.externalWorkId }
+				: {}),
 			updatedAt: new Date().toISOString(),
 		});
 		if (!updated) {
@@ -207,6 +239,20 @@ export class PostService {
 			!actor.roles.includes(UserRole.ADMIN)
 		) {
 			throw new ForbiddenException(this.i18n.t('errors.FORBIDDEN'));
+		}
+	}
+
+	private async requireExternalWork(id: string): Promise<void> {
+		const externalWork =
+			await this.prisma.database.orm.public.ExternalWork.first({
+				id,
+			});
+		if (!externalWork) {
+			throw new NotFoundException(
+				this.i18n.t('errors.NOT_FOUND', {
+					args: { entity: 'ExternalWork' },
+				}),
+			);
 		}
 	}
 }

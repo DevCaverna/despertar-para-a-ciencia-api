@@ -17,7 +17,11 @@ describe('Published posts (PostgreSQL e2e)', () => {
 	let prisma: PrismaService;
 	let authorId: string;
 	let publishedIds: string[];
+	let derivedPostId: string;
+	let ownPostId: string;
 	let draftId: string;
+	let externalWorkId: string;
+	let externalWorkDoi: string;
 	let nonPublicPosts: { id: string; content: string }[];
 	let validateToken: Mock;
 	let isolatedDatabase: Awaited<ReturnType<typeof createIsolatedDatabase>>;
@@ -39,6 +43,22 @@ describe('Published posts (PostgreSQL e2e)', () => {
 			name: 'Other author',
 			email: `posts-${randomUUID()}@example.com`,
 		});
+		const academicSource =
+			await prisma.database.orm.public.AcademicSource.create({
+				name: 'Nature',
+				issn: `ISSN-${randomUUID()}`,
+			});
+		const externalWork =
+			await prisma.database.orm.public.ExternalWork.create({
+				sourceId: academicSource.id,
+				doi: `10.1234/${randomUUID()}`,
+				title: 'Original academic work',
+				authors: ['Ada Lovelace'],
+				journal: 'Nature Communications',
+				url: 'https://publisher.example/original-work',
+			});
+		externalWorkId = externalWork.id;
+		externalWorkDoi = externalWork.doi;
 		validateToken.mockImplementation((token: string) => {
 			const profile = token === 'author' ? author : otherAuthor;
 			return {
@@ -71,11 +91,14 @@ describe('Published posts (PostgreSQL e2e)', () => {
 					content:
 						index < 3 ? fullContent : `Non-public content ${index}`,
 					rejectionReason: 'Internal information',
+					...(index === 0 ? { externalWorkId } : {}),
 					...data,
 				}),
 			),
 		);
 		publishedIds = [posts[0].id, posts[1].id].sort().reverse();
+		derivedPostId = posts[0].id;
+		ownPostId = posts[1].id;
 		publishedIds.push(posts[2].id);
 		draftId = posts[4].id;
 		nonPublicPosts = posts.slice(3);
@@ -151,15 +174,28 @@ describe('Published posts (PostgreSQL e2e)', () => {
 	it('returns exactly the public detail, including full content, without using authentication', async () => {
 		validateToken.mockClear();
 		await request(app.getHttpServer() as Server)
-			.get(`/posts/${publishedIds[0]}`)
+			.get(`/posts/${derivedPostId}`)
 			.expect(200, {
-				id: publishedIds[0],
+				id: derivedPostId,
 				title: 'Post title',
 				content: fullContent,
 				publishedAt: recentDate,
 				author: { id: authorId, name: 'Public author' },
+				academicSource: {
+					title: 'Original academic work',
+					journal: 'Nature Communications',
+					doi: externalWorkDoi,
+					url: 'https://publisher.example/original-work',
+				},
 			});
 		expect(validateToken).not.toHaveBeenCalled();
+	});
+
+	it('returns no academic source for a post that was not derived from ExternalWork', async () => {
+		const response = await request(app.getHttpServer() as Server)
+			.get(`/posts/${ownPostId}`)
+			.expect(200);
+		expect(response.body.academicSource).toBeNull();
 	});
 
 	it('returns the same 404 for absent, undated and unpublished posts', async () => {

@@ -1,0 +1,113 @@
+[
+	{
+		"id": "column.public.post.externalWorkId",
+		"label": "Add column \"externalWorkId\" to \"post\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "column",
+				"name": "externalWorkId",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure column \"externalWorkId\" is missing",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+				"params": ["public", "post", "externalWorkId"]
+			}
+		],
+		"execute": [
+			{
+				"description": "add column \"externalWorkId\"",
+				"sql": "ALTER TABLE \"public\".\"post\" ADD COLUMN \"externalWorkId\" uuid"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify column \"externalWorkId\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+				"params": ["public", "post", "externalWorkId"]
+			}
+		]
+	},
+	{
+		"id": "index.post.post_externalWorkId_idx_35efcfa1",
+		"label": "Create index \"post_externalWorkId_idx_35efcfa1\" on \"post\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "index",
+				"name": "post_externalWorkId_idx_35efcfa1",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure index \"post_externalWorkId_idx_35efcfa1\" does not exist",
+				"sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+				"params": ["\"public\".\"post_externalWorkId_idx_35efcfa1\""]
+			}
+		],
+		"execute": [
+			{
+				"description": "create index \"post_externalWorkId_idx_35efcfa1\"",
+				"sql": "CREATE INDEX \"post_externalWorkId_idx_35efcfa1\" ON \"public\".\"post\" (\"externalWorkId\")",
+				"params": []
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify index \"post_externalWorkId_idx_35efcfa1\" exists",
+				"sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+				"params": ["\"public\".\"post_externalWorkId_idx_35efcfa1\""]
+			}
+		]
+	},
+	{
+		"id": "foreignKey.post.post_externalWorkId_fkey",
+		"label": "Add foreign key \"post_externalWorkId_fkey\" on \"post\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "foreignKey",
+				"name": "post_externalWorkId_fkey",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure FK \"post_externalWorkId_fkey\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_fkey",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add FK \"post_externalWorkId_fkey\"",
+				"sql": "ALTER TABLE \"public\".\"post\"\nADD CONSTRAINT \"post_externalWorkId_fkey\"\nFOREIGN KEY (\"externalWorkId\")\nREFERENCES \"public\".\"externalWork\" (\"id\")\nON DELETE RESTRICT"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify FK \"post_externalWorkId_fkey\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_fkey",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		]
+	}
+]
