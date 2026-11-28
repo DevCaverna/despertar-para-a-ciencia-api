@@ -70,10 +70,17 @@ describe('Pino HTTP configuration', () => {
 		const logger = pino({ redact: options.redact }, stream);
 		logger.info({
 			password: 'password-test',
+			geminiApiKey: 'GEMINI_TEST_SECRET',
+			brevoApiKey: 'BREVO_TEST_SECRET',
+			hmacSecret: 'HMAC_TEST_SECRET',
+			verificationCode: '123456',
 			req: {
 				headers: {
 					authorization: 'Bearer TEST_SECRET',
 					cookie: 'session=TEST_SECRET',
+					'api-key': 'HEADER_API_KEY_SECRET',
+					'x-api-key': 'HEADER_X_API_KEY_SECRET',
+					'x-goog-api-key': 'HEADER_GOOG_KEY_SECRET',
 				},
 			},
 		});
@@ -81,5 +88,12 @@ describe('Pino HTTP configuration', () => {
 		const serialized = output.join('');
 		expect(serialized).not.toContain('password-test');
 		expect(serialized).not.toContain('TEST_SECRET');
+		expect(serialized).not.toContain('GEMINI_TEST_SECRET');
+		expect(serialized).not.toContain('BREVO_TEST_SECRET');
+		expect(serialized).not.toContain('HMAC_TEST_SECRET');
+		expect(serialized).not.toContain('123456');
+		expect(serialized).not.toContain('HEADER_API_KEY_SECRET');
+		expect(serialized).not.toContain('HEADER_X_API_KEY_SECRET');
+		expect(serialized).not.toContain('HEADER_GOOG_KEY_SECRET');
 	});
 });

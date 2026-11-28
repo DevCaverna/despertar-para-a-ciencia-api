@@ -7,10 +7,12 @@ Este diretório registra apenas conhecimento do projeto que não deve depender d
 | Preciso entender...                 | Documento                                                                       |
 | ----------------------------------- | ------------------------------------------------------------------------------- |
 | Arquitetura e fronteiras            | [Visão geral](arquitetura/visao-geral.md)                                       |
+| Fluxo editorial e limites do MVP    | [Fluxo editorial e limites do MVP](arquitetura/fluxo-editorial.md)              |
 | Fonte acadêmica do MVP              | [Decisão sobre Crossref](decisoes/0001-crossref-como-fonte-academica-do-mvp.md) |
 | Autenticação, perfis e papéis       | [Autenticação e usuários](arquitetura/autenticacao-e-usuarios.md)               |
 | Convenções específicas da aplicação | [Convenções da aplicação](desenvolvimento/convencoes-da-aplicacao.md)           |
 | Alterar o banco de dados            | [Migrations do banco](desenvolvimento/migracoes-do-banco.md)                    |
+| Dados de demonstração               | [Dados de demonstração](desenvolvimento/dados-de-demonstracao.md)               |
 | CI, imagem e cadeia de entrega      | [CI/CD](entrega/ci-cd.md)                                                       |
 | Releases e changelog                | [Releases e changelog](entrega/releases-e-changelog.md)                         |
 | Ambientes e secrets                 | [Ambientes e segredos](operacao/ambientes-e-segredos.md)                        |

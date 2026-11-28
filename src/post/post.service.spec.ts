@@ -30,7 +30,10 @@ describe('PostService', () => {
 	const actor = mockUser({ id: authorId, roles: [UserRole.COLLABORATOR] });
 	let create: ReturnType<typeof vi.fn>;
 	let first: ReturnType<typeof vi.fn>;
-	let update: ReturnType<typeof vi.fn>;
+	let reviewFirst: ReturnType<typeof vi.fn>;
+	let workFirst: ReturnType<typeof vi.fn>;
+	let workWhere: ReturnType<typeof vi.fn>;
+	let updateAll: ReturnType<typeof vi.fn>;
 	let where: ReturnType<typeof vi.fn>;
 	let offset: ReturnType<typeof vi.fn>;
 	let limit: ReturnType<typeof vi.fn>;
@@ -41,16 +44,28 @@ describe('PostService', () => {
 	beforeEach(() => {
 		create = vi.fn();
 		first = vi.fn();
-		update = vi.fn();
+		reviewFirst = vi.fn();
+		workFirst = vi.fn();
+		workWhere = vi.fn(() => ({ select: () => ({ first: workFirst }) }));
+		updateAll = vi.fn();
 		all = vi.fn(() => [draft]);
 		limit = vi.fn(() => ({ all }));
 		offset = vi.fn(() => ({ limit }));
-		where = vi.fn(() => ({ update, orderBy: () => ({ offset }) }));
+		where = vi.fn(() => ({
+			updateAll,
+			orderBy: () => ({ offset }),
+			include: () => ({ first: reviewFirst }),
+		}));
 		getProfile = vi.fn().mockResolvedValue({ id: authorId, active: true });
 		service = new PostService(
 			{
 				database: {
-					orm: { public: { Post: { create, first, where } } },
+					orm: {
+						public: {
+							Post: { create, first, where },
+							ExternalWork: { where: workWhere },
+						},
+					},
 				},
 			} as never,
 			{ getProfile } as never,
@@ -69,6 +84,171 @@ describe('PostService', () => {
 				},
 			),
 		).resolves.toEqual(draft);
+	});
+
+	it('submits only the validated draft content and returns confirmation', async () => {
+		first.mockResolvedValue(draft);
+		updateAll.mockResolvedValue([
+			{ ...draft, status: PostStatus.PENDING_REVIEW },
+		]);
+		await expect(service.submitDraft(actor, postId)).resolves.toEqual({
+			id: postId,
+			status: PostStatus.PENDING_REVIEW,
+			updatedAt: draft.updatedAt,
+		});
+		expect(where).toHaveBeenCalledWith({
+			id: postId,
+			authorId,
+			status: PostStatus.DRAFT,
+			title: draft.title,
+			content: draft.content,
+		});
+		expect(updateAll).toHaveBeenCalledWith({
+			status: PostStatus.PENDING_REVIEW,
+			updatedAt: expect.any(String),
+		});
+	});
+
+	it('returns only the linked academic work metadata in the protected review detail', async () => {
+		const admin = mockUser({ roles: [UserRole.ADMIN] });
+		const work = {
+			id: '019abcde-f000-7000-8000-000000000003',
+			title: 'Original academic work',
+			authors: ['Emmy Noether'],
+			journal: 'Academic Review',
+			publicationDate: '2026-09',
+			abstract: 'Original abstract.',
+			doi: '10.1234/example',
+			url: 'https://example.org/article',
+		};
+		reviewFirst.mockResolvedValue({
+			...draft,
+			status: PostStatus.PENDING_REVIEW,
+			author: null,
+			externalWorkId: work.id,
+		});
+		workFirst.mockResolvedValue(work);
+
+		await expect(
+			service.getReviewQueuePost(admin, postId),
+		).resolves.toEqual({
+			id: postId,
+			title: draft.title,
+			content: draft.content,
+			createdAt: draft.createdAt,
+			updatedAt: draft.updatedAt,
+			author: null,
+			status: PostStatus.PENDING_REVIEW,
+			externalWork: work,
+		});
+		expect(where).toHaveBeenCalledExactlyOnceWith({
+			id: postId,
+			status: PostStatus.PENDING_REVIEW,
+		});
+		expect(workWhere).toHaveBeenCalledExactlyOnceWith({ id: work.id });
+	});
+
+	it.each([PostStatus.PUBLISHED, PostStatus.REJECTED])(
+		'atomically limits a %s decision to a pending post and sets its date',
+		async (status) => {
+			const admin = mockUser({ roles: [UserRole.ADMIN] });
+			updateAll.mockImplementation((changes: Partial<Post>) => [
+				{ ...draft, ...changes },
+			]);
+			const updated = await service.decideReview(admin, postId, status);
+			expect(getProfile).toHaveBeenCalledWith(admin);
+			expect(where).toHaveBeenCalledExactlyOnceWith({
+				id: postId,
+				status: PostStatus.PENDING_REVIEW,
+			});
+			expect(updateAll).toHaveBeenCalledExactlyOnceWith({
+				status,
+				updatedAt: expect.any(String),
+				publishedAt:
+					status === PostStatus.PUBLISHED ? updated.updatedAt : null,
+			});
+			expect(updated.status).toBe(status);
+		},
+	);
+
+	it.each([
+		{ name: 'regular user', roles: [UserRole.USER] },
+		{ name: 'collaborator', roles: [UserRole.COLLABORATOR] },
+		{ name: 'actor without roles', roles: [] },
+	])(
+		'rejects a %s from every reviewer operation before querying posts',
+		async ({ roles }) => {
+			const unauthorizedActor = mockUser({ roles });
+
+			await expect(
+				service.listReviewQueue(unauthorizedActor, 1, 20),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.getReviewQueuePost(unauthorizedActor, postId),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.decideReview(
+					unauthorizedActor,
+					postId,
+					PostStatus.PUBLISHED,
+				),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			expect(getProfile).not.toHaveBeenCalled();
+			expect(where).not.toHaveBeenCalled();
+			expect(first).not.toHaveBeenCalled();
+			expect(workWhere).not.toHaveBeenCalled();
+		},
+	);
+
+	it('requires an active local profile for every reviewer operation', async () => {
+		getProfile.mockRejectedValue(new ForbiddenException());
+		const admin = mockUser({ roles: [UserRole.ADMIN] });
+
+		await expect(
+			service.listReviewQueue(admin, 1, 20),
+		).rejects.toBeInstanceOf(ForbiddenException);
+		await expect(
+			service.getReviewQueuePost(admin, postId),
+		).rejects.toBeInstanceOf(ForbiddenException);
+		await expect(
+			service.decideReview(admin, postId, PostStatus.REJECTED),
+		).rejects.toBeInstanceOf(ForbiddenException);
+
+		expect(getProfile).toHaveBeenCalledTimes(3);
+		expect(where).not.toHaveBeenCalled();
+		expect(first).not.toHaveBeenCalled();
+		expect(workWhere).not.toHaveBeenCalled();
+	});
+
+	it('distinguishes a missing post from a post already decided', async () => {
+		const admin = mockUser({ roles: [UserRole.ADMIN] });
+		updateAll.mockResolvedValue([]);
+		first
+			.mockResolvedValueOnce(null)
+			.mockResolvedValueOnce({ ...draft, status: PostStatus.PUBLISHED });
+		await expect(
+			service.decideReview(admin, postId, PostStatus.REJECTED),
+		).rejects.toBeInstanceOf(NotFoundException);
+		await expect(
+			service.decideReview(admin, postId, PostStatus.REJECTED),
+		).rejects.toBeInstanceOf(ConflictException);
+	});
+
+	it('rejects insufficient persisted content without writing', async () => {
+		first.mockResolvedValue({ ...draft, content: ' \n ' });
+		await expect(service.submitDraft(actor, postId)).rejects.toBeInstanceOf(
+			BadRequestException,
+		);
+		expect(updateAll).not.toHaveBeenCalled();
+	});
+
+	it('reports a conflict when the validated version changed before submission', async () => {
+		first.mockResolvedValue(draft);
+		updateAll.mockResolvedValue([]);
+		await expect(service.submitDraft(actor, postId)).rejects.toBeInstanceOf(
+			ConflictException,
+		);
 	});
 
 	it('rejects a regular user before writing a draft', async () => {
@@ -159,7 +339,7 @@ describe('PostService', () => {
 
 	it('updates only supplied fields of an owned draft', async () => {
 		first.mockResolvedValue(draft);
-		update.mockResolvedValue({ ...draft, title: 'Novo título' });
+		updateAll.mockResolvedValue([{ ...draft, title: 'Novo título' }]);
 
 		await expect(
 			service.updateDraft(actor, postId, { title: 'Novo título' }),
@@ -169,7 +349,7 @@ describe('PostService', () => {
 			authorId,
 			status: PostStatus.DRAFT,
 		});
-		expect(update).toHaveBeenCalledWith({
+		expect(updateAll).toHaveBeenCalledWith({
 			title: 'Novo título',
 			updatedAt: expect.any(String),
 		});
@@ -222,7 +402,7 @@ describe('PostService', () => {
 
 	it('rejects a status change between the ownership check and update', async () => {
 		first.mockResolvedValue(draft);
-		update.mockResolvedValue(null);
+		updateAll.mockResolvedValue([]);
 
 		await expect(
 			service.updateDraft(actor, postId, { content: 'Alteração' }),

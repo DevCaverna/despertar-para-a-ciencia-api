@@ -1,6 +1,6 @@
 # Visão geral da arquitetura
 
-O template separa entrada HTTP, aplicação, integrações externas e persistência. Os módulos de domínio não dependem de implementações de Firebase, Brevo ou R2; essas integrações ficam atrás de portas e adaptadores.
+A API do Despertar para a Ciência separa entrada HTTP, aplicação, integrações externas e persistência. Os módulos de domínio não dependem diretamente de implementações de Firebase, Brevo, R2, Crossref ou provedores de IA; essas integrações ficam atrás de portas e adaptadores.
 
 ## Modelo
 
@@ -14,7 +14,11 @@ flowchart LR
     Prisma --> PostgreSQL[PostgreSQL]
 ```
 
-A autenticação valida o token Firebase e autoriza as roles. Endpoints públicos não exigem token, mas continuam sujeitos às regras específicas de cada rota.
+A autenticação valida o token Firebase e autoriza as roles conforme [Autenticação e usuários](autenticacao-e-usuarios.md). Endpoints públicos não exigem token, mas continuam sujeitos às regras específicas de cada rota.
+
+## Fluxo editorial e limites do MVP
+
+O ciclo de vida de `Post` (`DRAFT`, `PENDING_REVIEW`, `PUBLISHED`, `REJECTED`), as permissões por papel e as decisões e ressalvas de escopo do MVP estão consolidados em [Fluxo editorial e limites do MVP](fluxo-editorial.md).
 
 ## Integração acadêmica
 

@@ -13,6 +13,7 @@
 		"docs:check": "node scripts/check-docs.mjs",
 		"prisma:contract:check": "pnpm prisma contract emit && git diff --exit-code -- src/prisma/contract.json src/prisma/contract.d.ts",
 		"prisma:migration:check": "pnpm prisma migration check",
+		"seed:demo": "tsx scripts/seed-demo.ts",
 		"start": "nest start",
 		"start:dev": "nest start --watch -e \"node --import ./dist/instrumentation.js\"",
 		"start:debug": "nest start --debug --watch -e \"node --import ./dist/instrumentation.js\"",

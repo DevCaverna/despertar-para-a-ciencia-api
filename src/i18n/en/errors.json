@@ -17,6 +17,10 @@
 	"POST_UPDATE_EMPTY": "Provide a title or content to update the draft",
 	"POST_DRAFT_PAGE_OUT_OF_RANGE": "The draft page is out of range",
 	"POST_NOT_DRAFT": "Only drafts can be edited",
+	"POST_REVIEW_DECISION_CONFLICT": "This post is no longer awaiting editorial review.",
+	"POST_REVIEW_PAGE_OUT_OF_RANGE": "The review queue page is out of range",
+	"POST_SUBMISSION_CONFLICT": "The post is no longer a draft or changed during submission. Reload it before trying again.",
+	"POST_SUBMISSION_CONTENT_REQUIRED": "A draft needs a title and content before submission.",
 	"ACADEMIC_SOURCE_UNAVAILABLE": "Unable to query the academic source. Please try again.",
 	"ACADEMIC_SOURCE_PAGINATION_INVALID": "The academic source returned invalid pagination.",
 	"ACADEMIC_WORK_DATE_RANGE_INVALID": "The start date must not be after the end date."
