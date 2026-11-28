@@ -17,6 +17,10 @@
 	"POST_UPDATE_EMPTY": "Informe título ou conteúdo para atualizar o rascunho",
 	"POST_DRAFT_PAGE_OUT_OF_RANGE": "A página de rascunhos está fora do intervalo permitido",
 	"POST_NOT_DRAFT": "Somente rascunhos podem ser editados",
+	"POST_REVIEW_DECISION_CONFLICT": "Este post já não está aguardando revisão editorial.",
+	"POST_REVIEW_PAGE_OUT_OF_RANGE": "A página da fila de revisão está fora do intervalo permitido",
+	"POST_SUBMISSION_CONFLICT": "O post deixou de ser rascunho ou mudou durante a submissão. Recarregue-o antes de tentar novamente.",
+	"POST_SUBMISSION_CONTENT_REQUIRED": "O rascunho precisa de título e conteúdo para ser enviado à revisão.",
 	"ACADEMIC_SOURCE_UNAVAILABLE": "Não foi possível consultar a fonte acadêmica. Tente novamente.",
 	"ACADEMIC_SOURCE_PAGINATION_INVALID": "A fonte acadêmica retornou uma paginação inválida.",
 	"ACADEMIC_WORK_DATE_RANGE_INVALID": "A data inicial não pode ser posterior à data final."
