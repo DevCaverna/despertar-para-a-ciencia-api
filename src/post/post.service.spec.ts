@@ -171,21 +171,54 @@ describe('PostService', () => {
 		},
 	);
 
-	it('requires an administrator with an active profile before a decision', async () => {
-		await expect(
-			service.decideReview(actor, postId, PostStatus.PUBLISHED),
-		).rejects.toBeInstanceOf(ForbiddenException);
-		expect(getProfile).not.toHaveBeenCalled();
+	it.each([
+		{ name: 'regular user', roles: [UserRole.USER] },
+		{ name: 'collaborator', roles: [UserRole.COLLABORATOR] },
+		{ name: 'actor without roles', roles: [] },
+	])(
+		'rejects a %s from every reviewer operation before querying posts',
+		async ({ roles }) => {
+			const unauthorizedActor = mockUser({ roles });
 
+			await expect(
+				service.listReviewQueue(unauthorizedActor, 1, 20),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.getReviewQueuePost(unauthorizedActor, postId),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.decideReview(
+					unauthorizedActor,
+					postId,
+					PostStatus.PUBLISHED,
+				),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			expect(getProfile).not.toHaveBeenCalled();
+			expect(where).not.toHaveBeenCalled();
+			expect(first).not.toHaveBeenCalled();
+			expect(workWhere).not.toHaveBeenCalled();
+		},
+	);
+
+	it('requires an active local profile for every reviewer operation', async () => {
 		getProfile.mockRejectedValue(new ForbiddenException());
+		const admin = mockUser({ roles: [UserRole.ADMIN] });
+
 		await expect(
-			service.decideReview(
-				mockUser({ roles: [UserRole.ADMIN] }),
-				postId,
-				PostStatus.REJECTED,
-			),
+			service.listReviewQueue(admin, 1, 20),
 		).rejects.toBeInstanceOf(ForbiddenException);
+		await expect(
+			service.getReviewQueuePost(admin, postId),
+		).rejects.toBeInstanceOf(ForbiddenException);
+		await expect(
+			service.decideReview(admin, postId, PostStatus.REJECTED),
+		).rejects.toBeInstanceOf(ForbiddenException);
+
+		expect(getProfile).toHaveBeenCalledTimes(3);
 		expect(where).not.toHaveBeenCalled();
+		expect(first).not.toHaveBeenCalled();
+		expect(workWhere).not.toHaveBeenCalled();
 	});
 
 	it('distinguishes a missing post from a post already decided', async () => {

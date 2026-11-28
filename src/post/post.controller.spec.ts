@@ -156,6 +156,15 @@ describe('PostController', () => {
 			.set('Authorization', token)
 			.send({ status: PostStatus.REJECTED })
 			.expect(403);
+		const deniedRoleRequests = [[UserRole.USER], []].map((roles) => {
+			validateToken.mockResolvedValueOnce({ ...actor, roles });
+			return client
+				.patch(path)
+				.set('Authorization', token)
+				.send({ status: PostStatus.REJECTED })
+				.expect(403);
+		});
+		await Promise.all(deniedRoleRequests);
 
 		const admin = { ...actor, roles: [UserRole.ADMIN] };
 		validateToken.mockResolvedValue(admin);
