@@ -52,6 +52,7 @@ describe('PostController', () => {
 	const submitDraft = vi.fn();
 	const listReviewQueue = vi.fn();
 	const getReviewQueuePost = vi.fn();
+	const decideReview = vi.fn();
 	const getPublished = vi.fn();
 	const validateToken = vi.fn();
 
@@ -70,6 +71,7 @@ describe('PostController', () => {
 						submitDraft,
 						listReviewQueue,
 						getReviewQueuePost,
+						decideReview,
 						getPublished,
 					},
 				},
@@ -139,6 +141,57 @@ describe('PostController', () => {
 			postId,
 		);
 		expect(getPublished).not.toHaveBeenCalled();
+	});
+
+	it('requires an administrator and accepts only a valid decision status', async () => {
+		const client = request(app.getHttpServer() as Server);
+		const path = `/posts/review-queue/${postId}/decision`;
+		const token = 'Bearer valid-token';
+		await client
+			.patch(path)
+			.send({ status: PostStatus.PUBLISHED })
+			.expect(401);
+		await client
+			.patch(path)
+			.set('Authorization', token)
+			.send({ status: PostStatus.REJECTED })
+			.expect(403);
+
+		const admin = { ...actor, roles: [UserRole.ADMIN] };
+		validateToken.mockResolvedValue(admin);
+		const invalidBodies = [
+			{},
+			{ status: PostStatus.DRAFT },
+			{ status: PostStatus.PENDING_REVIEW },
+			{ status: PostStatus.PUBLISHED, publishedAt: draft.updatedAt },
+		];
+		await Promise.all(
+			invalidBodies.map((body) =>
+				client
+					.patch(path)
+					.set('Authorization', token)
+					.send(body)
+					.expect(400),
+			),
+		);
+		expect(decideReview).not.toHaveBeenCalled();
+
+		const published = {
+			...draft,
+			status: PostStatus.PUBLISHED,
+			publishedAt: draft.updatedAt,
+		};
+		decideReview.mockResolvedValue(published);
+		await client
+			.patch(path)
+			.set('Authorization', token)
+			.send({ status: PostStatus.PUBLISHED })
+			.expect(200, published);
+		expect(decideReview).toHaveBeenCalledExactlyOnceWith(
+			admin,
+			postId,
+			PostStatus.PUBLISHED,
+		);
 	});
 
 	beforeEach(() => {

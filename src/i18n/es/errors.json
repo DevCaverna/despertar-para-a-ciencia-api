@@ -17,6 +17,7 @@
 	"POST_UPDATE_EMPTY": "Indica un título o contenido para actualizar el borrador",
 	"POST_DRAFT_PAGE_OUT_OF_RANGE": "La página de borradores está fuera del intervalo permitido",
 	"POST_NOT_DRAFT": "Solo se pueden editar borradores",
+	"POST_REVIEW_DECISION_CONFLICT": "Esta publicación ya no está pendiente de revisión editorial.",
 	"POST_REVIEW_PAGE_OUT_OF_RANGE": "La página de la cola de revisión está fuera del intervalo permitido",
 	"POST_SUBMISSION_CONFLICT": "El post ya no es un borrador o cambió durante el envío. Vuelve a cargarlo antes de intentarlo de nuevo.",
 	"POST_SUBMISSION_CONTENT_REQUIRED": "El borrador necesita título y contenido antes del envío.",

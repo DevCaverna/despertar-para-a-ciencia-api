@@ -28,6 +28,7 @@ export type I18nTranslations = {
         "POST_UPDATE_EMPTY": string;
         "POST_DRAFT_PAGE_OUT_OF_RANGE": string;
         "POST_NOT_DRAFT": string;
+        "POST_REVIEW_DECISION_CONFLICT": string;
         "POST_REVIEW_PAGE_OUT_OF_RANGE": string;
         "POST_SUBMISSION_CONFLICT": string;
         "POST_SUBMISSION_CONTENT_REQUIRED": string;

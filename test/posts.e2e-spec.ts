@@ -167,9 +167,104 @@ describe('Drafts and editorial review (e2e)', () => {
 			title: 'Editorial draft',
 			status: 'PENDING_REVIEW',
 			content: 'Full draft content',
+			externalWork: null,
 			createdAt: expect.any(String),
 			updatedAt: expect.any(String),
 			author: { id: authorId, name: 'Draft pagination test' },
 		});
+	});
+
+	it('persists only one final decision and exposes only approved posts publicly', async () => {
+		const client = request(app!.getHttpServer() as Server);
+		const token = 'Bearer test-token';
+		const create = async (submit = true): Promise<string> => {
+			authenticateAs(
+				mockAuthPort,
+				mockUser({ id: authorId, roles: [UserRole.COLLABORATOR] }),
+			);
+			const response = await client
+				.post('/posts')
+				.set('Authorization', token)
+				.send({
+					title: 'Post for editorial decision',
+					content: 'Review this content.',
+				})
+				.expect(201);
+			const id = (response.body as { id: string }).id;
+			if (submit) {
+				await client
+					.post(`/posts/drafts/${id}/submit`)
+					.set('Authorization', token)
+					.expect(200);
+			}
+			return id;
+		};
+		const decide = (
+			id: string,
+			status: 'PUBLISHED' | 'REJECTED',
+		): HttpRequest =>
+			client
+				.patch(`/posts/review-queue/${id}/decision`)
+				.set('Authorization', token)
+				.send({ status });
+
+		const draft = await create(false);
+		const toApprove = await create();
+		const toReject = await create();
+		const contested = await create();
+		await decide(toReject, 'REJECTED').expect(403);
+
+		authenticateAs(
+			mockAuthPort,
+			mockUser({ id: otherAuthorId, roles: [UserRole.ADMIN] }),
+		);
+		await decide(draft, 'PUBLISHED').expect(409);
+		const approved = await decide(toApprove, 'PUBLISHED').expect(200);
+		const { publishedAt } = approved.body as { publishedAt: string };
+		expect(approved.body).toMatchObject({
+			id: toApprove,
+			status: 'PUBLISHED',
+			publishedAt: expect.any(String),
+		});
+		const publishedDate = new Date(publishedAt).toISOString();
+		await decide(toApprove, 'REJECTED').expect(409);
+		await client
+			.get(`/posts/${toApprove}`)
+			.expect(200)
+			.expect((response) => {
+				expect(response.body).toMatchObject({
+					id: toApprove,
+					publishedAt: publishedDate,
+				});
+			});
+		await client
+			.get(`/posts/review-queue/${toApprove}`)
+			.set('Authorization', token)
+			.expect(404);
+
+		const rejected = await decide(toReject, 'REJECTED').expect(200);
+		expect(rejected.body).toMatchObject({
+			id: toReject,
+			status: 'REJECTED',
+			publishedAt: null,
+		});
+		await decide(toReject, 'PUBLISHED').expect(409);
+		await client.get(`/posts/${toReject}`).expect(404);
+
+		const decisions = await Promise.all([
+			decide(contested, 'PUBLISHED'),
+			decide(contested, 'REJECTED'),
+		]);
+		expect(
+			decisions.map(({ status }) => status).sort((a, b) => a - b),
+		).toEqual([200, 409]);
+		const winner = decisions.find(({ status }) => status === 200)!.body as {
+			status: string;
+		};
+		const { rows } = await pool.query<{ status: string }>(
+			'SELECT status FROM public.post WHERE id = $1',
+			[contested],
+		);
+		expect(rows[0].status).toBe(winner.status);
 	});
 });
