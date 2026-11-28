@@ -4,29 +4,34 @@ import { assertPostStatusTransition, PostStatus } from './post-status.js';
 import type { Post } from './post.js';
 
 describe('post editorial status', () => {
-	const allowedTransitions: Array<[PostStatus, PostStatus]> = [
+	const allowedTransitions = new Set([
+		`${PostStatus.DRAFT}->${PostStatus.PENDING_REVIEW}`,
+		`${PostStatus.PENDING_REVIEW}->${PostStatus.PUBLISHED}`,
+		`${PostStatus.PENDING_REVIEW}->${PostStatus.REJECTED}`,
+		`${PostStatus.REJECTED}->${PostStatus.DRAFT}`,
+	]);
+
+	it.each([
 		[PostStatus.DRAFT, PostStatus.PENDING_REVIEW],
 		[PostStatus.PENDING_REVIEW, PostStatus.PUBLISHED],
 		[PostStatus.PENDING_REVIEW, PostStatus.REJECTED],
 		[PostStatus.REJECTED, PostStatus.DRAFT],
-	];
+	] as const)('allows %s -> %s', (current, next) => {
+		expect(() => assertPostStatusTransition(current, next)).not.toThrow();
+	});
 
 	it.each(
 		Object.values(PostStatus).flatMap((current) =>
-			Object.values(PostStatus).map((next) => [current, next] as const),
+			Object.values(PostStatus)
+				.filter(
+					(next) => !allowedTransitions.has(`${current}->${next}`),
+				)
+				.map((next) => [current, next] as const),
 		),
-	)('validates %s -> %s', (current, next) => {
-		const transition = (): void =>
-			assertPostStatusTransition(current, next);
-		if (
-			allowedTransitions.some(
-				([from, to]) => from === current && to === next,
-			)
-		) {
-			expect(transition).not.toThrow();
-		} else {
-			expect(transition).toThrow('Invalid post status transition');
-		}
+	)('rejects invalid transition %s -> %s', (current, next) => {
+		expect(() => assertPostStatusTransition(current, next)).toThrow(
+			`Invalid post status transition: ${current} -> ${next}`,
+		);
 	});
 
 	it('accepts a status from the persisted Post type', () => {
