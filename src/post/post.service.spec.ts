@@ -14,12 +14,14 @@ import { PostService } from './post.service.js';
 
 const authorId = '019abcde-f000-7000-8000-000000000001';
 const postId = '019abcde-f000-7000-8000-000000000002';
+const externalWorkId = '019abcde-f000-7000-8000-000000000003';
 const draft: Post = {
 	id: postId,
 	authorId,
 	title: 'Título original',
 	content: 'Conteúdo original',
 	status: PostStatus.DRAFT,
+	externalWorkId: null,
 	rejectionReason: null,
 	publishedAt: null,
 	createdAt: '2026-10-02T12:00:00.000Z',
@@ -32,6 +34,8 @@ describe('PostService', () => {
 	let first: ReturnType<typeof vi.fn>;
 	let update: ReturnType<typeof vi.fn>;
 	let where: ReturnType<typeof vi.fn>;
+	let externalWorkFirst: ReturnType<typeof vi.fn>;
+	let query: Record<string, ReturnType<typeof vi.fn>>;
 	let offset: ReturnType<typeof vi.fn>;
 	let limit: ReturnType<typeof vi.fn>;
 	let all: ReturnType<typeof vi.fn>;
@@ -43,19 +47,82 @@ describe('PostService', () => {
 		first = vi.fn();
 		update = vi.fn();
 		all = vi.fn(() => [draft]);
-		limit = vi.fn(() => ({ all }));
-		offset = vi.fn(() => ({ limit }));
-		where = vi.fn(() => ({ update, orderBy: () => ({ offset }) }));
+		query = {};
+		query.where = vi.fn(() => query);
+		query.orderBy = vi.fn(() => query);
+		query.offset = vi.fn(() => query);
+		query.limit = vi.fn(() => query);
+		query.select = vi.fn(() => query);
+		query.include = vi.fn(() => query);
+		query.all = all;
+		query.first = first;
+		query.update = update;
+		limit = query.limit;
+		offset = query.offset;
+		where = vi.fn(() => query);
+		externalWorkFirst = vi.fn();
 		getProfile = vi.fn().mockResolvedValue({ id: authorId, active: true });
 		service = new PostService(
 			{
 				database: {
-					orm: { public: { Post: { create, first, where } } },
+					orm: {
+						public: {
+							Post: { create, first, where },
+							ExternalWork: { first: externalWorkFirst },
+						},
+					},
 				},
 			} as never,
 			{ getProfile } as never,
 			{ t: vi.fn((key: string) => key) } as never,
 		);
+	});
+
+	it('returns the original academic citation only for derived published posts', async () => {
+		first.mockResolvedValue({
+			id: postId,
+			title: draft.title,
+			content: draft.content,
+			publishedAt: draft.createdAt,
+			author: null,
+			externalWork: {
+				title: 'Trabalho acadêmico original',
+				doi: '10.1234/original',
+				journal: null,
+				url: null,
+				source: { name: 'Journal from Crossref ISSN catalog' },
+			},
+		});
+
+		await expect(service.getPublished(postId)).resolves.toEqual({
+			id: postId,
+			title: draft.title,
+			content: draft.content,
+			publishedAt: draft.createdAt,
+			author: null,
+			academicSource: {
+				title: 'Trabalho acadêmico original',
+				journal: 'Journal from Crossref ISSN catalog',
+				doi: '10.1234/original',
+				url: null,
+			},
+		});
+		expect(query.include).toHaveBeenCalledWith(
+			'externalWork',
+			expect.any(Function),
+		);
+
+		first.mockResolvedValue({
+			id: postId,
+			title: draft.title,
+			content: draft.content,
+			publishedAt: draft.createdAt,
+			author: null,
+			externalWork: null,
+		});
+		await expect(service.getPublished(postId)).resolves.toMatchObject({
+			academicSource: null,
+		});
 	});
 
 	it('allows an administrator to create a draft', async () => {
@@ -145,6 +212,40 @@ describe('PostService', () => {
 		});
 	});
 
+	it('associates a draft with an existing academic work', async () => {
+		externalWorkFirst.mockResolvedValue({ id: externalWorkId });
+		create.mockResolvedValue({ ...draft, externalWorkId });
+
+		await expect(
+			service.createDraft(actor, {
+				title: draft.title,
+				content: draft.content,
+				externalWorkId,
+			}),
+		).resolves.toMatchObject({ externalWorkId });
+		expect(externalWorkFirst).toHaveBeenCalledWith({ id: externalWorkId });
+		expect(create).toHaveBeenCalledWith({
+			authorId,
+			title: draft.title,
+			content: draft.content,
+			status: PostStatus.DRAFT,
+			externalWorkId,
+		});
+	});
+
+	it('rejects a draft association with an unknown academic work', async () => {
+		externalWorkFirst.mockResolvedValue(null);
+
+		await expect(
+			service.createDraft(actor, {
+				title: draft.title,
+				content: draft.content,
+				externalWorkId,
+			}),
+		).rejects.toBeInstanceOf(NotFoundException);
+		expect(create).not.toHaveBeenCalled();
+	});
+
 	it('does not create a post without an active local profile', async () => {
 		getProfile.mockRejectedValue(new ForbiddenException());
 
@@ -171,6 +272,29 @@ describe('PostService', () => {
 		});
 		expect(update).toHaveBeenCalledWith({
 			title: 'Novo título',
+			updatedAt: expect.any(String),
+		});
+	});
+
+	it('replaces or clears the academic source on an owned draft', async () => {
+		first.mockResolvedValue(draft);
+		externalWorkFirst.mockResolvedValue({ id: externalWorkId });
+		update.mockResolvedValue({ ...draft, externalWorkId });
+
+		await expect(
+			service.updateDraft(actor, postId, { externalWorkId }),
+		).resolves.toMatchObject({ externalWorkId });
+		expect(update).toHaveBeenLastCalledWith({
+			externalWorkId,
+			updatedAt: expect.any(String),
+		});
+
+		update.mockResolvedValue({ ...draft, externalWorkId: null });
+		await expect(
+			service.updateDraft(actor, postId, { externalWorkId: null }),
+		).resolves.toMatchObject({ externalWorkId: null });
+		expect(update).toHaveBeenLastCalledWith({
+			externalWorkId: null,
 			updatedAt: expect.any(String),
 		});
 	});

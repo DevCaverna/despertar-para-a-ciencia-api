@@ -21,6 +21,8 @@ model Post {
   id              Uuid                @id @default(dbgenerated("uuidv7()"))
   authorId        Uuid
   author          User                @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  externalWorkId  Uuid?
+  externalWork    ExternalWork?       @relation(fields: [externalWorkId], references: [id], onDelete: Restrict)
   title           String
   content         String
   status          PostStatus          @default(DRAFT)
@@ -45,6 +47,7 @@ model ExternalWork {
   id              Uuid                @id @default(dbgenerated("uuidv7()"))
   sourceId        Uuid
   source          AcademicSource      @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  posts           Post[]
   doi             String              @unique
   title           String
   authors         String[]

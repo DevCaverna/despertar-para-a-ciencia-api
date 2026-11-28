@@ -27,6 +27,7 @@ describe('PublicPostController HTTP', () => {
 	let app: INestApplication;
 	const listPublished = vi.fn();
 	const getPublished = vi.fn();
+	const createDraft = vi.fn();
 	const listDrafts = vi.fn();
 	const getDraft = vi.fn();
 	const updateDraft = vi.fn();
@@ -48,7 +49,11 @@ describe('PublicPostController HTTP', () => {
 		perPage: 20,
 		hasNextPage: false,
 	};
-	const detail = { ...page.items[0], content: 'Full content' };
+	const detail = {
+		...page.items[0],
+		content: 'Full content',
+		academicSource: null,
+	};
 
 	beforeAll(async () => {
 		const module = await Test.createTestingModule({
@@ -58,6 +63,7 @@ describe('PublicPostController HTTP', () => {
 				{
 					provide: PostService,
 					useValue: {
+						createDraft,
 						listPublished,
 						getPublished,
 						listDrafts,
@@ -84,6 +90,7 @@ describe('PublicPostController HTTP', () => {
 		vi.resetAllMocks();
 		listPublished.mockResolvedValue(page);
 		getPublished.mockResolvedValue(detail);
+		createDraft.mockResolvedValue({});
 		validateToken.mockResolvedValue({
 			subject: 'reader',
 			roles: [UserRole.USER],
@@ -191,16 +198,46 @@ describe('PublicPostController HTTP', () => {
 		await client
 			.patch(`/posts/${detail.id}`)
 			.set('Authorization', 'Bearer editor')
-			.send({ title: 'Edited' })
+			.send({ externalWorkId: null })
 			.expect(200, { ...draft, title: 'Edited' });
 		expect(listDrafts).toHaveBeenCalledExactlyOnceWith(editor, 1, 20);
 		expect(getDraft).toHaveBeenCalledExactlyOnceWith(editor, detail.id);
 		expect(updateDraft).toHaveBeenCalledExactlyOnceWith(
 			editor,
 			detail.id,
-			expect.objectContaining({ title: 'Edited' }),
+			expect.objectContaining({ externalWorkId: null }),
 		);
 		expect(getPublished).not.toHaveBeenCalled();
+	});
+
+	it('accepts an optional UUIDv7 source when creating a draft and rejects other UUID versions', async () => {
+		validateToken.mockResolvedValue(editor);
+		const externalWorkId = '019abcde-f000-7000-8000-000000000003';
+		await request(app.getHttpServer() as Server)
+			.post('/posts')
+			.set('Authorization', 'Bearer editor')
+			.send({
+				title: 'Derived post',
+				content: 'Post content',
+				externalWorkId,
+			})
+			.expect(201);
+		expect(createDraft).toHaveBeenCalledExactlyOnceWith(editor, {
+			title: 'Derived post',
+			content: 'Post content',
+			externalWorkId,
+		});
+
+		await request(app.getHttpServer() as Server)
+			.post('/posts')
+			.set('Authorization', 'Bearer editor')
+			.send({
+				title: 'Derived post',
+				content: 'Post content',
+				externalWorkId: '019abcde-f000-4000-8000-000000000003',
+			})
+			.expect(400);
+		expect(createDraft).toHaveBeenCalledOnce();
 	});
 
 	it.each([
@@ -298,12 +335,14 @@ describe('PublicPostController HTTP', () => {
 				'content',
 				'publishedAt',
 				'author',
+				'academicSource',
 			]),
 			properties: {
 				id: { format: 'uuid' },
 				content: { type: 'string' },
 				publishedAt: { format: 'date-time' },
 				author: { nullable: true },
+				academicSource: { nullable: true },
 			},
 		});
 		const draft = document.paths['/posts/drafts/{id}'].get!;

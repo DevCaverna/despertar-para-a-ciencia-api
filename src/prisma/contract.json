@@ -207,6 +207,21 @@
               }
             },
             "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "externalWorkId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "public"
+                }
+              },
               "source": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -287,6 +302,13 @@
                   "kind": "scalar"
                 }
               },
+              "externalWorkId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -352,6 +374,22 @@
                   "model": "User",
                   "namespace": "public"
                 }
+              },
+              "externalWork": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "externalWorkId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ExternalWork",
+                  "namespace": "public"
+                }
               }
             },
             "storage": {
@@ -364,6 +402,9 @@
                 },
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "externalWorkId": {
+                  "column": "externalWorkId"
                 },
                 "id": {
                   "column": "id"
@@ -671,6 +712,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "externalWorkId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/uuid@1",
                   "default": {
@@ -737,6 +783,23 @@
                     "namespaceId": "public",
                     "tableName": "user"
                   }
+                },
+                {
+                  "onDelete": "restrict",
+                  "source": {
+                    "columns": [
+                      "externalWorkId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "post"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "externalWork"
+                  }
                 }
               ],
               "indexes": [
@@ -746,6 +809,14 @@
                   ],
                   "name": "post_authorId_idx_e47547ed",
                   "prefix": "post_authorId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "externalWorkId"
+                  ],
+                  "name": "post_externalWorkId_idx_35efcfa1",
+                  "prefix": "post_externalWorkId_idx",
                   "unique": false
                 }
               ],
@@ -837,7 +908,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "cef6efd65939578a4e129348e6d26b518ae8295c8dda69165cf2936cf685e7c7"
+    "storageHash": "97d6eed3ba5703d08982da36106615eb96ca5205b06f78b3da271071ddccc7ed"
   },
   "capabilities": {
     "postgres": {

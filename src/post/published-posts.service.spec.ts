@@ -216,6 +216,7 @@ describe('PostService.getPublished', () => {
 			content: post.content,
 			publishedAt: post.publishedAt,
 			author: { id: post.author.id, name: post.author.name },
+			academicSource: null,
 		});
 		expect(query.where).toHaveBeenNthCalledWith(1, {
 			id: post.id,
@@ -231,7 +232,7 @@ describe('PostService.getPublished', () => {
 			'content',
 			'publishedAt',
 		);
-		expect(query.include).toHaveBeenCalledExactlyOnceWith(
+		expect(query.include).toHaveBeenCalledWith(
 			'author',
 			expect.any(Function),
 		);
@@ -240,6 +241,32 @@ describe('PostService.getPublished', () => {
 		expect(select).toHaveBeenCalledExactlyOnceWith('id', 'name');
 		expect(query.first).toHaveBeenCalledOnce();
 		expect(getProfile).not.toHaveBeenCalled();
+	});
+
+	it('returns the linked external work as the academic source', async () => {
+		query.first.mockResolvedValue({
+			...post,
+			externalWork: {
+				title: 'Original work',
+				doi: '10.1234/original',
+				journal: 'Journal of Science',
+				url: 'https://publisher.example/work',
+				source: { name: 'Crossref source' },
+			},
+		});
+
+		await expect(service.getPublished(post.id)).resolves.toMatchObject({
+			academicSource: {
+				title: 'Original work',
+				journal: 'Journal of Science',
+				doi: '10.1234/original',
+				url: 'https://publisher.example/work',
+			},
+		});
+		expect(query.include).toHaveBeenCalledWith(
+			'externalWork',
+			expect.any(Function),
+		);
 	});
 
 	it('returns a null author when unavailable', async () => {
