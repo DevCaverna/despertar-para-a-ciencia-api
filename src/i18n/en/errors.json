@@ -19,5 +19,8 @@
 	"POST_NOT_DRAFT": "Only drafts can be edited",
 	"ACADEMIC_SOURCE_UNAVAILABLE": "Unable to query the academic source. Please try again.",
 	"ACADEMIC_SOURCE_PAGINATION_INVALID": "The academic source returned invalid pagination.",
-	"ACADEMIC_WORK_DATE_RANGE_INVALID": "The start date must not be after the end date."
+	"ACADEMIC_WORK_DATE_RANGE_INVALID": "The start date must not be after the end date.",
+	"ACADEMIC_WORK_ABSTRACT_REQUIRED": "The academic work must have an abstract to generate a draft.",
+	"POST_ALREADY_EXISTS_FOR_WORK": "A post linked to this academic work already exists.",
+	"AI_DRAFT_GENERATION_UNAVAILABLE": "Unable to generate the AI-assisted draft. Please try again."
 }

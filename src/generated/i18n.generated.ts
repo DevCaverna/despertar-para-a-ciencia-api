@@ -31,6 +31,9 @@ export type I18nTranslations = {
         "ACADEMIC_SOURCE_UNAVAILABLE": string;
         "ACADEMIC_SOURCE_PAGINATION_INVALID": string;
         "ACADEMIC_WORK_DATE_RANGE_INVALID": string;
+        "ACADEMIC_WORK_ABSTRACT_REQUIRED": string;
+        "POST_ALREADY_EXISTS_FOR_WORK": string;
+        "AI_DRAFT_GENERATION_UNAVAILABLE": string;
     };
     "fields": {
         "id": string;

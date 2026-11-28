@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AiModule } from '../ai/ai.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { UserModule } from '../user/user.module.js';
 import { PostController } from './post.controller.js';
@@ -7,7 +8,7 @@ import { PostService } from './post.service.js';
 import { PublicPostController } from './public-post.controller.js';
 
 @Module({
-	imports: [PrismaModule, UserModule],
+	imports: [PrismaModule, UserModule, AiModule],
 	// Register GET /posts/drafts before the public GET /posts/:id.
 	controllers: [PostController, PublicPostController],
 	providers: [PostService],

@@ -18,8 +18,10 @@ import {
 	ApiOkResponse,
 	ApiOperation,
 	ApiParam,
+	ApiServiceUnavailableResponse,
 	ApiTags,
 	ApiUnauthorizedResponse,
+	ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 
 import type { AuthUser } from '../auth/domain/auth.types.js';
@@ -28,6 +30,7 @@ import { Actor } from '../decorators/actor.decorator.js';
 import { Roles } from '../decorators/roles.decorator.js';
 import type { Post as PostEntity } from './domain/post.js';
 import { CreateDraftDto } from './dto/create-draft.dto.js';
+import { GenerateDraftFromWorkDto } from './dto/generate-draft-from-work.dto.js';
 import { ListDraftsQueryDto } from './dto/list-drafts-query.dto.js';
 import { UpdateDraftDto } from './dto/update-draft.dto.js';
 import { PostModel } from './models/post.model.js';
@@ -48,6 +51,34 @@ export class PostController {
 		@Body() body: CreateDraftDto,
 	): Promise<PostEntity> {
 		return this.posts.createDraft(actor, body);
+	}
+
+	@Post('from-academic-work')
+	@Roles(UserRole.COLLABORATOR, UserRole.ADMIN)
+	@ApiOperation({
+		summary: 'Generate a draft post from an imported academic work',
+	})
+	@ApiCreatedResponse({ type: PostModel })
+	@ApiBadRequestResponse({ description: 'Invalid ExternalWork UUIDv7.' })
+	@ApiUnauthorizedResponse({ description: 'Missing or invalid token.' })
+	@ApiForbiddenResponse({
+		description: 'Insufficient role or inactive profile.',
+	})
+	@ApiNotFoundResponse({ description: 'Academic work not found.' })
+	@ApiConflictResponse({
+		description: 'A post already exists for this academic work.',
+	})
+	@ApiUnprocessableEntityResponse({
+		description: 'Academic work has no abstract for draft generation.',
+	})
+	@ApiServiceUnavailableResponse({
+		description: 'AI draft generation provider unavailable.',
+	})
+	generateDraftFromWork(
+		@Actor() actor: AuthUser,
+		@Body() body: GenerateDraftFromWorkDto,
+	): Promise<PostEntity> {
+		return this.posts.generateDraftFromWork(actor, body.externalWorkId);
 	}
 
 	@Get('drafts')

@@ -26,6 +26,8 @@ A escolha da Crossref para o MVP, a evidência da POC e suas limitações estão
 
 A integração de IA fica atrás da porta `AiDraftGeneratorPort` no `AiModule`, com suporte aos drivers `noop` (padrão) e `gemini`. O prompt delimita os metadados e o resumo do trabalho para restringir a geração às informações da fonte, exige resposta estruturada em JSON (`title` e `content`) e mapeia falhas em erros tipados (`configuration`, `invalid-input`, `invalid-response`, `timeout`, `unavailable`) sem persistir conteúdo inconsistente.
 
+`POST /posts/from-academic-work` permite a colaboradores e administradores com perfil local ativo gerar um `Post` em `DRAFT` a partir de um `ExternalWork` que possua resumo. O post é persistido com vínculo único (`externalWorkId`) para impedir que o mesmo trabalho origine múltiplos posts por acidente e pode ser editado normalmente pelo fluxo de rascunhos.
+
 ## Operação
 
 A aplicação valida sua configuração na inicialização, expõe health checks e pode exportar telemetria OpenTelemetry. A cadeia de entrega constrói e promove uma imagem OCI única; detalhes estão em [CI/CD](../entrega/ci-cd.md) e [Deploy e recuperação](../operacao/deploy-e-recuperacao.md).

@@ -51,6 +51,7 @@ describe('PostService.listPublished', () => {
 			{ database: { orm: { public: { Post: query } } } } as never,
 			{} as never,
 			{} as never,
+			{} as never,
 		);
 	});
 
@@ -195,6 +196,7 @@ describe('PostService.getPublished', () => {
 		{ database: { orm: { public: { Post: query } } } } as never,
 		{ getProfile } as never,
 		{ t: (key: string) => key } as never,
+		{} as never,
 	);
 
 	beforeEach(() => {

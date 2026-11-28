@@ -1,0 +1,120 @@
+[
+	{
+		"id": "column.public.post.externalWorkId",
+		"label": "Add column \"externalWorkId\" to \"post\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "column",
+				"name": "externalWorkId",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure column \"externalWorkId\" is missing",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+				"params": ["public", "post", "externalWorkId"]
+			}
+		],
+		"execute": [
+			{
+				"description": "add column \"externalWorkId\"",
+				"sql": "ALTER TABLE \"public\".\"post\" ADD COLUMN \"externalWorkId\" uuid"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify column \"externalWorkId\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+				"params": ["public", "post", "externalWorkId"]
+			}
+		]
+	},
+	{
+		"id": "unique.post.post_externalWorkId_key",
+		"label": "Add unique constraint on \"post\" (externalWorkId)",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "unique",
+				"name": "post_externalWorkId_key",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure constraint \"post_externalWorkId_key\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_key",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add unique constraint \"post_externalWorkId_key\"",
+				"sql": "ALTER TABLE \"public\".\"post\" ADD CONSTRAINT \"post_externalWorkId_key\" UNIQUE (\"externalWorkId\")"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify constraint \"post_externalWorkId_key\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_key",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		]
+	},
+	{
+		"id": "foreignKey.post.post_externalWorkId_fkey",
+		"label": "Add foreign key \"post_externalWorkId_fkey\" on \"post\"",
+		"operationClass": "additive",
+		"target": {
+			"id": "postgres",
+			"details": {
+				"schema": "public",
+				"objectType": "foreignKey",
+				"name": "post_externalWorkId_fkey",
+				"table": "post"
+			}
+		},
+		"precheck": [
+			{
+				"description": "ensure FK \"post_externalWorkId_fkey\" does not exist",
+				"sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_fkey",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		],
+		"execute": [
+			{
+				"description": "add FK \"post_externalWorkId_fkey\"",
+				"sql": "ALTER TABLE \"public\".\"post\"\nADD CONSTRAINT \"post_externalWorkId_fkey\"\nFOREIGN KEY (\"externalWorkId\")\nREFERENCES \"public\".\"externalWork\" (\"id\")\nON DELETE RESTRICT"
+			}
+		],
+		"postcheck": [
+			{
+				"description": "verify FK \"post_externalWorkId_fkey\" exists",
+				"sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+				"params": [
+					"post_externalWorkId_fkey",
+					"public",
+					"\"public\".\"post\""
+				]
+			}
+		]
+	}
+]
