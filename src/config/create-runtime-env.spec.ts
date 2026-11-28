@@ -135,4 +135,54 @@ describe('create-runtime-env.sh', () => {
 			rmSync(directory, { recursive: true, force: true });
 		}
 	});
+
+	it('omits empty AI variables and writes Gemini configuration when set', () => {
+		const directory = mkdtempSync(
+			join(tmpdir(), 'despertar-para-a-ciencia-api-runtime-env-'),
+		);
+		const output = join(directory, 'runtime.env');
+
+		try {
+			const emptyAiEnvironment: Record<string, string | undefined> = {
+				...process.env,
+				...runtimeEnvironment(),
+				AI_DRIVER: '',
+				GEMINI_API_KEY: '',
+				GEMINI_MODEL: '',
+				GEMINI_TIMEOUT_MS: '',
+			};
+			execFileSync('sh', [script, output], {
+				env: emptyAiEnvironment,
+			});
+			const withoutAi = readFileSync(output, 'utf8');
+			expect(withoutAi).not.toContain('AI_DRIVER=');
+			expect(withoutAi).not.toContain('GEMINI_API_KEY=');
+			expect(() =>
+				environmentSchema.parse(parse(withoutAi)),
+			).not.toThrow();
+
+			execFileSync('sh', [script, output], {
+				env: {
+					...process.env,
+					...runtimeEnvironment(),
+					AI_DRIVER: 'gemini',
+					GEMINI_API_KEY: 'gemini-runtime-secret',
+					GEMINI_MODEL: 'gemini-2.5-flash',
+					GEMINI_TIMEOUT_MS: '15000',
+				},
+			});
+			const withGemini = readFileSync(output, 'utf8');
+			expect(withGemini).toContain('AI_DRIVER=gemini\n');
+			expect(withGemini).toContain(
+				'GEMINI_API_KEY=gemini-runtime-secret\n',
+			);
+			expect(withGemini).toContain('GEMINI_MODEL=gemini-2.5-flash\n');
+			expect(withGemini).toContain('GEMINI_TIMEOUT_MS=15000\n');
+			expect(() =>
+				environmentSchema.parse(parse(withGemini)),
+			).not.toThrow();
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
 });

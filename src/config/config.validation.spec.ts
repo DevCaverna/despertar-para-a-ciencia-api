@@ -148,4 +148,26 @@ describe('validateEnvironment', () => {
 		delete config.OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE;
 		expect(environmentSchema.safeParse(config).success).toBe(false);
 	});
+
+	it('defaults AI_DRIVER to noop and requires non-empty GEMINI_API_KEY when gemini is selected', () => {
+		const config = validEnvironment();
+		expect(environmentSchema.parse(config).AI_DRIVER).toBe('noop');
+
+		config.AI_DRIVER = 'gemini';
+		config.GEMINI_API_KEY = '';
+		expect(environmentSchema.safeParse(config).success).toBe(false);
+
+		config.GEMINI_API_KEY = '   ';
+		expect(environmentSchema.safeParse(config).success).toBe(false);
+
+		config.GEMINI_API_KEY = '  gemini-test-key  ';
+		config.GEMINI_MODEL = '  gemini-2.5-flash  ';
+		config.GEMINI_TIMEOUT_MS = '20000';
+		expect(environmentSchema.parse(config)).toMatchObject({
+			AI_DRIVER: 'gemini',
+			GEMINI_API_KEY: 'gemini-test-key',
+			GEMINI_MODEL: 'gemini-2.5-flash',
+			GEMINI_TIMEOUT_MS: 20000,
+		});
+	});
 });

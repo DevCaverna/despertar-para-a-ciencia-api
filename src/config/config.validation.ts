@@ -34,6 +34,11 @@ const optionalString = z.preprocess(
 	z.string().min(1).optional(),
 );
 
+const optionalTrimmedString = z.preprocess(
+	(value) => (typeof value === 'string' ? value.trim() || undefined : value),
+	z.string().min(1).optional(),
+);
+
 const optionalEmail = z.preprocess(
 	(value) => (value === '' ? undefined : value),
 	z.string().email().optional(),
@@ -87,6 +92,13 @@ const baseEnvironmentSchema = z.object({
 	BREVO_API_KEY: optionalString,
 	BREVO_SENDER_EMAIL: optionalEmail,
 	STORAGE_DRIVER: z.enum(['memory', 'r2']),
+	AI_DRIVER: z.enum(['noop', 'gemini']).default('noop'),
+	GEMINI_API_KEY: optionalTrimmedString,
+	GEMINI_MODEL: optionalTrimmedString,
+	GEMINI_TIMEOUT_MS: z.preprocess(
+		(value) => (value === '' ? undefined : value),
+		z.coerce.number().int().min(1000).max(120000).optional(),
+	),
 	CLOUDFLARE_R2_ACCOUNT_ID: optionalString,
 	CLOUDFLARE_R2_ACCESS_KEY_ID: optionalString,
 	CLOUDFLARE_R2_SECRET_ACCESS_KEY: optionalString,
@@ -154,6 +166,14 @@ export const environmentSchema = baseEnvironmentSchema.superRefine(
 					});
 				}
 			}
+		}
+
+		if (environment.AI_DRIVER === 'gemini' && !environment.GEMINI_API_KEY) {
+			context.addIssue({
+				code: 'custom',
+				path: ['GEMINI_API_KEY'],
+				message: 'GEMINI_API_KEY is required when AI_DRIVER=gemini.',
+			});
 		}
 
 		if (

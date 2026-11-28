@@ -20,6 +20,22 @@ export interface R2Config {
 	publicUrl: string;
 }
 
+export interface GeminiConfig {
+	apiKey: string;
+	model: string;
+	timeoutMs: number;
+}
+
+export type AiConfig =
+	| {
+			driver: 'noop';
+			gemini?: undefined;
+	  }
+	| {
+			driver: 'gemini';
+			gemini: GeminiConfig;
+	  };
+
 export type MailConfig =
 	| {
 			driver: 'noop';
@@ -69,6 +85,7 @@ export interface AppConfig {
 	};
 	mail: MailConfig;
 	storage: StorageConfig;
+	ai: AiConfig;
 	http: {
 		corsOrigins: string[];
 		swaggerEnabled: boolean;

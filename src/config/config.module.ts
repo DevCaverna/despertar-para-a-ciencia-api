@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import {
+	aiConfig,
 	appConfig,
 	authConfig,
 	databaseConfig,
@@ -21,6 +22,7 @@ import { environmentSchema } from './config.validation.js';
 			isGlobal: true,
 			cache: true,
 			load: [
+				aiConfig,
 				appConfig,
 				databaseConfig,
 				authConfig,
